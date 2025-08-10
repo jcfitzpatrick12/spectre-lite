@@ -168,7 +168,7 @@ make_empty_spectrogram(const size_t num_spectrums,
     }
     return (spectrel_spectrogram_t){
         num_spectrums, num_samples_per_spectrum, samples, times, frequencies};
-};
+}
 
 void free_spectrogram(spectrel_spectrogram_t *spectrogram)
 {
@@ -201,7 +201,7 @@ static void compute_times(spectrel_spectrogram_t *s,
                           const size_t hop)
 {
     const double sample_interval = 1 / sample_rate;
-    for (int n = 0; n < s->num_spectrums; n++)
+    for (size_t n = 0; n < s->num_spectrums; n++)
     {
         s->times[n] = sample_interval * hop * n;
     }
