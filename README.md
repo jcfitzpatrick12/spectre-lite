@@ -3,15 +3,13 @@ Record spectrograms with [SoapySDR](https://github.com/pothosware/SoapySDR) and 
 
 > :warning: This is conduit repo to explore C, and the named libraries. Eventually, I'll add them into [spectre](https://github.com/jcfitzpatrick12/spectre).
 
-# Prerequisites
+## Getting Started
 
-- [FFTW3](https://www.fftw.org/) development library  
-  On Ubuntu/Debian, install with:
-  ```bash
-  sudo apt-get install libfftw3-dev
-  ```
+### Prerequisites
 
-# Installation
+- [FFTW3](https://www.fftw.org/)
+
+### Installation
 
 1. Build the binary:
    ```bash
