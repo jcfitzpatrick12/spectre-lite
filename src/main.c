@@ -13,16 +13,16 @@ int main(int argc, char *argv[])
 {
 
     // Define a cosine wave.
-    const size_t num_samples = 65536;
-    const double sample_rate = 4096;
+    const size_t num_samples = 1024;
+    const double sample_rate = 256;
     const double frequency = 1;
     const double phase = 0;
     const double amplitude = 1;
 
     // Define the window.
     spectrel_window_type_t window_type = CONSTANT;
-    const size_t window_size = 4096;
-    const size_t hop = 4096;
+    const size_t window_size = 128;
+    const size_t hop = 128;
 
     // Make the window.
     spectrel_signal_t window = make_window(window_type, window_size);
@@ -45,12 +45,13 @@ int main(int argc, char *argv[])
     fftw_plan p = make_plan(&buffer);
 
     // Perform the short-time FFT.
-    spectrel_spectrogram_t s = stfft(p, &buffer, &cosine_wave, &window, hop);
+    spectrel_spectrogram_t s =
+        stfft(p, &buffer, &cosine_wave, &window, hop, sample_rate);
 
     // Release memory.
+    fftw_destroy_plan(p);
     free_spectrogram(&s);
     free_signal(&buffer);
     free_signal(&cosine_wave);
     free_signal(&window);
-    fftw_destroy_plan(p);
 }

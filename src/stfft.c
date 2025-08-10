@@ -90,21 +90,6 @@ void free_signal(spectrel_signal_t *signal)
     }
 }
 
-void print_signal(const spectrel_signal_t *signal)
-{
-    if (signal && signal->samples)
-    {
-        for (size_t n = 0; n < signal->num_samples; n++)
-        {
-            fprintf(stdout,
-                    "%f + "
-                    "%fi\n",
-                    signal->samples[n][0],
-                    signal->samples[n][1]);
-        }
-    }
-}
-
 spectrel_signal_t make_cosine_signal(const size_t num_samples,
                                      const double sample_rate,
                                      const double frequency,
@@ -153,49 +138,89 @@ fftw_plan make_plan(spectrel_signal_t *buffer)
 
 static spectrel_spectrogram_t make_null_spectrogram()
 {
-    return (spectrel_spectrogram_t){0, NULL};
+    return (spectrel_spectrogram_t){0, 0, NULL, NULL, NULL};
 }
 
-static spectrel_spectrogram_t
-make_empty_spectrogram(const size_t num_spectrums, const size_t num_frequencies)
+spectrel_spectrogram_t
+make_empty_spectrogram(const size_t num_spectrums,
+                       const size_t num_samples_per_spectrum)
 {
-    spectrel_signal_t *spectrums =
-        malloc(sizeof(spectrel_signal_t) * num_spectrums);
+    const size_t total_num_samples = num_spectrums * num_samples_per_spectrum;
+    fftw_complex *samples = malloc(sizeof(fftw_complex) * total_num_samples);
+    double *times = malloc(sizeof(double) * num_spectrums);
+    double *frequencies = malloc(sizeof(double) * num_samples_per_spectrum);
 
-    if (!spectrums)
+    if (!samples || !times || !frequencies)
     {
+        if (samples)
+        {
+            free(samples);
+        }
+        if (times)
+        {
+            free(times);
+        }
+        if (frequencies)
+        {
+            free(frequencies);
+        }
         return make_null_spectrogram();
     }
-
-    for (int n = 0; n < num_spectrums; n++)
-    {
-        spectrums[n] = make_empty_signal(num_frequencies);
-        if (!spectrums[n].samples)
-        {
-            // Free all previously allocated signals
-            for (size_t i = 0; i < n; i++)
-            {
-                free_signal(&spectrums[i]);
-            }
-            free(spectrums);
-            return make_null_spectrogram();
-        }
-    }
-    return (spectrel_spectrogram_t){num_spectrums, spectrums};
+    return (spectrel_spectrogram_t){
+        num_spectrums, num_samples_per_spectrum, samples, times, frequencies};
 };
 
 void free_spectrogram(spectrel_spectrogram_t *spectrogram)
 {
-
-    if (spectrogram && spectrogram->spectrums)
+    if (spectrogram)
     {
-        for (int n = 0; n < spectrogram->num_spectrums; n++)
+        if (spectrogram->samples)
         {
-            free_signal(&spectrogram->spectrums[n]);
+            free(spectrogram->samples);
+            spectrogram->samples = NULL;
         }
-        free(spectrogram->spectrums);
-        spectrogram->spectrums = NULL;
+
+        if (spectrogram->times)
+        {
+            free(spectrogram->times);
+            spectrogram->times = NULL;
+        }
+
+        if (spectrogram->frequencies)
+        {
+            free(spectrogram->frequencies);
+            spectrogram->frequencies = NULL;
+        }
+        spectrogram->num_samples_per_spectrum = 0;
         spectrogram->num_spectrums = 0;
+    }
+}
+
+static void compute_times(spectrel_spectrogram_t *s,
+                          const double sample_rate,
+                          const size_t hop)
+{
+    const double sample_interval = 1 / sample_rate;
+    for (int n = 0; n < s->num_spectrums; n++)
+    {
+        s->times[n] = sample_interval * hop * n;
+    }
+}
+
+static void compute_frequencies(spectrel_spectrogram_t *s,
+                                const double sample_rate)
+{
+    const size_t N = s->num_samples_per_spectrum;
+    for (size_t n = 0; n < N; n++)
+    {
+        if (n < N / 2)
+        {
+            s->frequencies[n] = ((double)n / N) * sample_rate;
+        }
+        else
+        {
+            s->frequencies[n] = -1 * (1 - ((double)n / N)) * sample_rate;
+        }
     }
 }
 
@@ -203,7 +228,8 @@ spectrel_spectrogram_t stfft(fftw_plan p,
                              spectrel_signal_t *buffer,
                              const spectrel_signal_t *signal,
                              const spectrel_signal_t *window,
-                             const size_t hop)
+                             const size_t hop,
+                             const double sample_rate)
 {
     // Ensure the buffer is the same size as the window.
     if (buffer->num_samples != window->num_samples)
@@ -211,6 +237,12 @@ spectrel_spectrogram_t stfft(fftw_plan p,
         return make_null_spectrogram();
     }
     const size_t window_size = window->num_samples;
+
+    // Ensure the window size is even.
+    if (window_size % 2)
+    {
+        return make_null_spectrogram();
+    }
 
     // Calculate how many spectrums (time frames) will be in the spectrogram.
     // The first window is centered at the start of the signal (index 0).
@@ -220,10 +252,10 @@ spectrel_spectrogram_t stfft(fftw_plan p,
         (size_t)ceil((signal->num_samples + window_midpoint) / hop);
 
     // Allocate an empty spectrogram on the heap.
-    spectrel_spectrogram_t spectrogram =
+    spectrel_spectrogram_t s =
         make_empty_spectrogram(num_spectrums, window_size);
 
-    if (!spectrogram.spectrums)
+    if (!s.samples)
     {
         return make_null_spectrogram();
     }
@@ -249,14 +281,19 @@ spectrel_spectrogram_t stfft(fftw_plan p,
             }
         }
 
-        // Compute the DFT.
+        // Compute the DFT in-place.
         fftw_execute(p);
 
-        // Copy over the result into the spectrogram.
-        memcpy(spectrogram.spectrums[n].samples,
+        // Copy the result into the spectrogram.
+        memcpy(s.samples + n * window_size,
                buffer->samples,
                sizeof(fftw_complex) * window_size);
     }
 
-    return spectrogram;
+    // Compute the physical times associated with each spectrum.
+    compute_times(&s, sample_rate, hop);
+
+    // Compute the physical frequencies associated with each spectral component.
+    compute_frequencies(&s, sample_rate);
+    return s;
 }
