@@ -1,36 +1,56 @@
-// Compute the DFT and write the result to file.
-// Then, extend it to the SciPy ShortTimeFFT.
+#include "spectrel.h"
 
-#include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
-#include <fftw3.h>
 
-#include "synth_signal.h"
-#include "errors.h"
-
-void print_samples(int num_samples, fftw_complex* samples)
+void exit_with_failure(const char *msg)
 {
-    for (int n=0; n < num_samples; n++)
-    {
-        printf("%f + %f\n", samples[n][0], samples[n][1]);
-    }
+    fprintf(stderr, "%s\n", msg);
+    exit(EXIT_FAILURE);
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-    int num_samples = 16;
-    synth_signal_t signal_type = CONSTANT; 
-    fftw_complex* samples = malloc(sizeof(fftw_complex)*num_samples);
 
-    if (make_signal(signal_type, num_samples, samples) == FAILURE)
+    // Define a cosine wave.
+    const size_t num_samples = 65536;
+    const double sample_rate = 4096;
+    const double frequency = 1;
+    const double phase = 0;
+    const double amplitude = 1;
+
+    // Define the window.
+    spectrel_window_type_t window_type = CONSTANT;
+    const size_t window_size = 4096;
+    const size_t hop = 4096;
+
+    // Make the window.
+    spectrel_signal_t window = make_window(window_type, window_size);
+
+    // Make the cosine wave.
+    spectrel_signal_t cosine_wave = make_cosine_signal(
+        num_samples, sample_rate, frequency, amplitude, phase);
+
+    // Make an empty buffer, where'll we'll keep performing in-place DFT's.
+    spectrel_signal_t buffer = make_empty_signal(window.num_samples);
+
+    // Check the memory allocations succeeded.
+    if (!window.samples || !cosine_wave.samples || !buffer.samples)
     {
-        fprintf(stderr, "Invalid signal type.\n");
-	free(samples);
-        exit(1);   
+        exit_with_failure("Memory allocation "
+                          "failed.");
     }
-     
-    print_samples(num_samples, samples);
 
-    free(samples);
-    return 0;
+    // Make a reusable plan.
+    fftw_plan p = make_plan(&buffer);
+
+    // Perform the short-time FFT.
+    spectrel_spectrogram_t s = stfft(p, &buffer, &cosine_wave, &window, hop);
+
+    // Release memory.
+    free_spectrogram(&s);
+    free_signal(&buffer);
+    free_signal(&cosine_wave);
+    free_signal(&window);
+    fftw_destroy_plan(p);
 }
