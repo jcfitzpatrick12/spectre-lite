@@ -1,6 +1,3 @@
-// Clean up and simplify the short-time fft implementation.
-// Return "big" structs by pointer, not by value.
-
 #include "spectrel.h"
 
 #include <stdio.h>
