@@ -2,298 +2,331 @@
 
 #include <fftw3.h>
 #include <math.h>
-#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-
-#define SIGMA 0.25 // Gaussian width
-
-typedef void (*signal_generator_t)(const size_t num_samples,
-                                   fftw_complex *samples);
-
-static void signal_generator_constant(const size_t num_samples,
-                                      fftw_complex *samples)
-{
-    for (size_t n = 0; n < num_samples; n++)
-    {
-        samples[n][0] = 1.0;
-        samples[n][1] = 0.0;
-    }
-}
-
-static void signal_generator_gaussian(const size_t num_samples,
-                                      fftw_complex *samples)
-{
-    const double center = ((double)num_samples - 1) / 2.0;
-    for (size_t n = 0; n < num_samples; n++)
-    {
-        double x = (n - center) / (SIGMA * center);
-        samples[n][0] = exp(-0.5 * pow(x, 2));
-        samples[n][1] = 0.0;
-    }
-}
-
-static void signal_generator_hanning(const size_t num_samples,
-                                     fftw_complex *samples)
-{
-    for (size_t n = 0; n < num_samples; n++)
-    {
-        samples[n][0] =
-            0.5 * (1 - cos(2 * M_PI * n / ((double)num_samples - 1)));
-        samples[n][1] = 0.0;
-    }
-}
-
-static spectrel_signal_t make_null_signal()
-{
-    return (spectrel_signal_t){0, NULL};
-}
-
-spectrel_signal_t make_window(const spectrel_window_type_t window_type,
-                              const size_t num_samples)
-{
-    signal_generator_t signal_generator;
-    switch (window_type)
-    {
-    case CONSTANT:
-        signal_generator = &signal_generator_constant;
-        break;
-    case GAUSSIAN:
-        signal_generator = &signal_generator_gaussian;
-        break;
-    case HANNING:
-        signal_generator = &signal_generator_hanning;
-        break;
-    default:
-        return make_null_signal();
-    }
-
-    fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
-
-    if (!samples)
-    {
-        return make_null_signal();
-    }
-
-    signal_generator(num_samples, samples);
-
-    spectrel_signal_t signal = {num_samples, samples};
-    return signal;
-}
 
 void free_signal(spectrel_signal_t *signal)
 {
-    if (signal && signal->samples)
+    fftw_free(signal->samples);
+    free(signal);
+}
+
+void describe_signal(const spectrel_signal_t *signal)
+{
+    printf("Number of samples: %zu\n", signal->num_samples);
+
+    // If there's no samples, early return since we don't have anything more to
+    // print.
+    if (!signal->num_samples)
     {
-        fftw_free(signal->samples);
-        signal->samples = NULL;
-        signal->num_samples = 0;
+        return;
+    }
+
+    printf("Samples:\n");
+    for (size_t n = 0; n < signal->num_samples; n++)
+    {
+        printf("  %f + %fi\n", signal->samples[n][0], signal->samples[n][1]);
     }
 }
 
-spectrel_signal_t make_cosine_signal(const size_t num_samples,
-                                     const double sample_rate,
-                                     const double frequency,
-                                     const double amplitude,
-                                     const double phase)
+static spectrel_signal_t *make_empty_signal(const size_t num_samples)
 {
     fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
 
+    // Handle if the memory allocation fails.
     if (!samples)
     {
-        return make_null_signal();
+        return NULL;
+    }
+    spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
+
+    // Handle if the memory allocation fails.
+    if (!signal)
+    {
+        fftw_free(samples);
+        return NULL;
     }
 
+    signal->num_samples = num_samples;
+    signal->samples = samples;
+    return signal;
+}
+
+spectrel_signal_t *make_buffer(const size_t num_samples)
+{
+    return make_empty_signal(num_samples);
+}
+
+spectrel_signal_t *make_cosine_signal(const size_t num_samples,
+                                      const double sample_rate,
+                                      const double frequency,
+                                      const double amplitude,
+                                      const double phase)
+{
+    fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
+
+    // Handle if the memory allocation failed.
+    if (!samples)
+    {
+        return NULL;
+    }
+
+    // Initialise the sample values.
     for (size_t n = 0; n < num_samples; n++)
     {
-        samples[n][0] = cos(2 * M_PI * (frequency / sample_rate) * n + phase);
+        double arg = 2 * M_PI * (frequency / sample_rate) * (double)(n) + phase;
+        samples[n][0] = amplitude * cos(arg);
+
+        // Zero the imaginary component.
+        samples[n][1] = 0;
+    }
+
+    spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
+    signal->num_samples = num_samples;
+    signal->samples = samples;
+    return signal;
+}
+
+spectrel_signal_t *make_constant_signal(const size_t num_samples,
+                                        const double value)
+{
+    fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
+
+    // Handle if the memory allocation failed.
+    if (!samples)
+    {
+        return NULL;
+    }
+
+    // Initialise the sample values.
+    for (size_t n = 0; n < num_samples; n++)
+    {
+        samples[n][0] = value;
         samples[n][1] = 0.0;
     }
 
-    spectrel_signal_t signal = {num_samples, samples};
+    spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
+    signal->num_samples = num_samples;
+    signal->samples = samples;
     return signal;
 }
 
-spectrel_signal_t make_empty_signal(const size_t num_samples)
+static spectrel_signal_t *make_boxcar_window(const size_t num_samples)
 {
-    fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
+    return make_constant_signal(num_samples, 1.0);
+}
 
-    if (!samples)
+spectrel_signal_t *make_window(spectrel_window_type_t window_type,
+                               const size_t num_samples)
+{
+    spectrel_signal_t *(*signal_generator)(const size_t num_samples);
+
+    if (window_type == BOXCAR)
     {
-        return make_null_signal();
+        signal_generator = &make_boxcar_window;
     }
 
-    spectrel_signal_t signal = {num_samples, samples};
-    return signal;
+    // Handle if the window type has not been implemented.
+    else
+    {
+        return NULL;
+    }
+
+    return signal_generator(num_samples);
 }
 
 fftw_plan make_plan(spectrel_signal_t *buffer)
 {
-    // In-place, 1D DFT.
     return fftw_plan_dft_1d(buffer->num_samples,
                             buffer->samples,
                             buffer->samples,
                             FFTW_FORWARD,
-                            FFTW_PATIENT);
+                            FFTW_ESTIMATE);
 }
 
-static spectrel_spectrogram_t make_null_spectrogram()
-{
-    return (spectrel_spectrogram_t){0, 0, NULL, NULL, NULL};
-}
-
-spectrel_spectrogram_t
+static spectrel_spectrogram_t *
 make_empty_spectrogram(const size_t num_spectrums,
                        const size_t num_samples_per_spectrum)
 {
-    const size_t total_num_samples = num_spectrums * num_samples_per_spectrum;
-    fftw_complex *samples = malloc(sizeof(fftw_complex) * total_num_samples);
+    fftw_complex *samples =
+        malloc(sizeof(fftw_complex) * num_samples_per_spectrum * num_spectrums);
     double *times = malloc(sizeof(double) * num_spectrums);
     double *frequencies = malloc(sizeof(double) * num_samples_per_spectrum);
 
+    // Handle if any of the memory allocation failed.
     if (!samples || !times || !frequencies)
     {
-        if (samples)
-        {
-            free(samples);
-        }
-        if (times)
-        {
-            free(times);
-        }
-        if (frequencies)
-        {
-            free(frequencies);
-        }
-        return make_null_spectrogram();
+        free(samples);
+        free(times);
+        free(frequencies);
+        return NULL;
     }
-    return (spectrel_spectrogram_t){
-        num_spectrums, num_samples_per_spectrum, samples, times, frequencies};
+
+    spectrel_spectrogram_t *spectrogram =
+        malloc(sizeof(spectrel_spectrogram_t));
+    spectrogram->num_spectrums = num_spectrums;
+    spectrogram->num_samples_per_spectrum = num_samples_per_spectrum;
+    spectrogram->samples = samples;
+    spectrogram->times = times;
+    spectrogram->frequencies = frequencies;
+    return spectrogram;
 }
 
 void free_spectrogram(spectrel_spectrogram_t *spectrogram)
 {
-    if (spectrogram)
+    free(spectrogram->samples);
+    free(spectrogram->times);
+    free(spectrogram->frequencies);
+    free(spectrogram);
+}
+
+static void compute_times(double *times,
+                           const size_t num_spectrums,
+                           const double sample_rate,
+                           const size_t window_hop)
+{
+    for (size_t n = 0; n < num_spectrums; n++)
     {
-        if (spectrogram->samples)
-        {
-            free(spectrogram->samples);
-            spectrogram->samples = NULL;
-        }
-
-        if (spectrogram->times)
-        {
-            free(spectrogram->times);
-            spectrogram->times = NULL;
-        }
-
-        if (spectrogram->frequencies)
-        {
-            free(spectrogram->frequencies);
-            spectrogram->frequencies = NULL;
-        }
-        spectrogram->num_samples_per_spectrum = 0;
-        spectrogram->num_spectrums = 0;
+        times[n] = (double)(n * window_hop) * (1 / sample_rate);
     }
 }
 
-static void compute_times(spectrel_spectrogram_t *s,
-                          const double sample_rate,
-                          const size_t hop)
+static void compute_frequencies(double *frequencies,
+                                 const size_t num_samples_per_spectrum,
+                                 const double sample_rate)
 {
-    const double sample_interval = 1 / sample_rate;
-    for (size_t n = 0; n < s->num_spectrums; n++)
+    size_t M = num_samples_per_spectrum;
+    for (size_t m = 0; m < M; m++)
     {
-        s->times[n] = sample_interval * hop * n;
-    }
-}
-
-static void compute_frequencies(spectrel_spectrogram_t *s,
-                                const double sample_rate)
-{
-    const size_t N = s->num_samples_per_spectrum;
-    for (size_t n = 0; n < N; n++)
-    {
-        if (n < N / 2)
+        if (m < M / 2)
         {
-            s->frequencies[n] = ((double)n / N) * sample_rate;
+            frequencies[m] = ((double)m / M) * sample_rate;
         }
         else
         {
-            s->frequencies[n] = -1 * (1 - ((double)n / N)) * sample_rate;
+            frequencies[m] = -1 * (1 - ((double)m / M)) * sample_rate;
         }
     }
 }
 
-spectrel_spectrogram_t stfft(fftw_plan p,
-                             spectrel_signal_t *buffer,
-                             const spectrel_signal_t *signal,
-                             const spectrel_signal_t *window,
-                             const size_t hop,
-                             const double sample_rate)
+spectrel_spectrogram_t *stfft(const fftw_plan p,
+                              spectrel_signal_t *buffer,
+                              const spectrel_signal_t *window,
+                              const spectrel_signal_t *signal,
+                              const size_t window_hop,
+                              const double sample_rate)
 {
-    // Ensure the buffer is the same size as the window.
-    if (buffer->num_samples != window->num_samples)
+
+    size_t window_size = window->num_samples;
+    size_t window_midpoint = window_size / 2;
+    size_t buffer_size = buffer->num_samples;
+    size_t signal_size = signal->num_samples;
+
+    // The buffer must be the same size as the window.
+    if (buffer_size != window_size)
     {
-        return make_null_spectrogram();
-    }
-    const size_t window_size = window->num_samples;
-
-    // Ensure the window size is even.
-    if (window_size % 2)
-    {
-        return make_null_spectrogram();
-    }
-
-    // Calculate how many spectrums (time frames) will be in the spectrogram.
-    // The first window is centered at the start of the signal (index 0).
-    // The last window is the final one that still overlaps with the signal.
-    const size_t window_midpoint = window_size / 2;
-    const size_t num_spectrums =
-        (size_t)ceil((signal->num_samples + window_midpoint) / hop);
-
-    // Allocate an empty spectrogram on the heap.
-    spectrel_spectrogram_t s =
-        make_empty_spectrogram(num_spectrums, window_size);
-
-    if (!s.samples)
-    {
-        return make_null_spectrogram();
+        return NULL;
     }
 
-    int signal_index;
+    // The window must fit within the signal.
+    if (window_size > signal_size)
+    {
+        return NULL;
+    }
+
+    // The window size and hop must be at least one.
+    if (window_size < 1 || window_hop < 1)
+    {
+        return NULL;
+    }
+
+    // The number of spectrums is determined by the hop and window size.
+    size_t num_spectrums =
+        ((signal_size - (size_t)ceil(window_size / 2)) / window_hop) + 1;
+
+    // The number of samples in the spectrum is the same number of samples in
+    // each window.
+    size_t num_samples_per_spectrum = window_size;
+
+    // Allocate memory for an empty spectrogram.
+    spectrel_spectrogram_t *s =
+        make_empty_spectrogram(num_spectrums, num_samples_per_spectrum);
+
+    // Handle if the memory allocation fails
+    if (!s)
+    {
+        return NULL;
+    }
+
+    // Assign baseband frequencies to each spectral component.
+    compute_frequencies(s->frequencies, num_samples_per_spectrum, sample_rate);
+
+    // Assign physical times to each spectrum in the spectrogram.
+    compute_times(s->times, num_spectrums, sample_rate, window_hop);
+
+    // Initialise the window such that it's mid-point is at sample index 0.
+    int start = -1 * window_midpoint;
+    int end = start + window_size;
+
     for (size_t n = 0; n < num_spectrums; n++)
     {
-        // Fill up the buffer.
         for (size_t m = 0; m < window_size; m++)
         {
-            signal_index = m - window_midpoint + hop * n;
-            if (signal_index >= 0 && signal_index < (int)signal->num_samples)
+            // Copy the samples for the current window into the buffer.
+            // (The signal is assumed to be zero if the window dangles).
+            if (start + m < 0)
             {
-                buffer->samples[m][0] =
-                    signal->samples[signal_index][0] * window->samples[m][0];
-                buffer->samples[m][1] =
-                    signal->samples[signal_index][1] * window->samples[m][1];
+                buffer->samples[m][0] = 0;
+                buffer->samples[m][1] = 0;
             }
             else
             {
-                buffer->samples[m][0] = 0.0;
-                buffer->samples[m][1] = 0.0;
+                buffer->samples[m][0] =
+                    signal->samples[start + m][0] * window->samples[m][0];
+                buffer->samples[m][1] =
+                    signal->samples[start + m][1] * window->samples[m][1];
             }
         }
 
-        // Compute the DFT in-place.
+        // Execute the DFT.
         fftw_execute(p);
 
         // Copy the result into the spectrogram.
-        memcpy(s.samples + n * window_size,
+        memcpy(s->samples + n * num_samples_per_spectrum,
                buffer->samples,
-               sizeof(fftw_complex) * window_size);
+               sizeof(fftw_complex) * buffer_size);
+
+        // Hop the window forward.
+        start += window_hop;
+        end += window_hop;
+    }
+    return s;
+}
+
+void describe_spectrogram(const spectrel_spectrogram_t *s)
+{
+    printf("Number of spectrums: %zu\n", s->num_spectrums);
+    printf("Number of samples per spectrum: %zu\n",
+           s->num_samples_per_spectrum);
+
+    // If there's no samples, early return since we don't have anything more to
+    // print.
+    if (!s->num_spectrums || !s->num_samples_per_spectrum)
+    {
+        return;
     }
 
-    // Compute the physical times associated with each spectrum.
-    compute_times(&s, sample_rate, hop);
-
-    // Compute the physical frequencies associated with each spectral component.
-    compute_frequencies(&s, sample_rate);
-    return s;
+    size_t N = s->num_spectrums;
+    size_t M = s->num_samples_per_spectrum;
+    for (size_t n = 0; n < N; n++)
+    {
+        printf("Time %.2f [s]:\n", s->times[n]);
+        for (size_t m = 0; m < M; m++)
+        {
+            printf("  %.2f [Hz]: %.2f + %.2fi\n",
+                   s->frequencies[m],
+                   s->samples[n * M + m][0],
+                   s->samples[n * M + m][1]);
+        }
+    }
 }
