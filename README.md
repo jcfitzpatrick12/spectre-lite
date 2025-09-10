@@ -1,7 +1,7 @@
 # spectre-lite
 Record spectrograms with [SoapySDR](https://github.com/pothosware/SoapySDR) and the [FFTW](https://www.fftw.org/) library.
 
-> :warning: This is conduit repo to explore C, and the named libraries. Eventually, I'll add them into [Spectre](https://github.com/jcfitzpatrick12/spectre).
+> :warning: This repo is in active development. It's a conduit for me to explore C and the named libraries. Eventually, I'll add them into [Spectre](https://github.com/jcfitzpatrick12/spectre).
 
 ## Getting Started
 
