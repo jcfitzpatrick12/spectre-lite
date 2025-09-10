@@ -33,11 +33,20 @@ static spectrel_signal_t *make_empty_signal(const size_t num_samples)
 {
     fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
 
+    // Handle if the memory allocation fails.
     if (!samples)
     {
         return NULL;
     }
     spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
+
+    // Handle if the memory allocation fails.
+    if (!signal)
+    {
+        fftw_free(samples);
+        return NULL;
+    }
+
     signal->num_samples = num_samples;
     signal->samples = samples;
     return signal;
@@ -171,7 +180,7 @@ void free_spectrogram(spectrel_spectrogram_t *spectrogram)
     free(spectrogram);
 }
 
-static void *compute_times(double *times,
+static void compute_times(double *times,
                            const size_t num_spectrums,
                            const double sample_rate,
                            const size_t window_hop)
@@ -182,7 +191,7 @@ static void *compute_times(double *times,
     }
 }
 
-static void *compute_frequencies(double *frequencies,
+static void compute_frequencies(double *frequencies,
                                  const size_t num_samples_per_spectrum,
                                  const double sample_rate)
 {
