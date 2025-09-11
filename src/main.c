@@ -58,10 +58,19 @@ int main(int argc, char *argv[])
 
     // Release memory.
     free_signal(signal);
+    signal = NULL;
+
     free_signal(window);
+    window = NULL;
+
     free_signal(buffer);
+    buffer = NULL;
+
     free_spectrogram(s);
+    s = NULL;
+
     fftw_destroy_plan(p);
+    p = NULL;
 
     return EXIT_SUCCESS;
 }
