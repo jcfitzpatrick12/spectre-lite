@@ -5,10 +5,23 @@
 #include <stdio.h>
 #include <string.h>
 
-void free_signal(spectrel_signal_t *signal)
+void free_signal(spectrel_signal_t *s)
 {
-    fftw_free(signal->samples);
-    free(signal);
+    if (s)
+    {
+        if (s->samples)
+        {
+            fftw_free(s->samples);
+            s->samples = NULL;
+        }
+
+        if (s->num_samples != 0)
+        {
+            s->num_samples = 0;
+        }
+
+        free(s);
+    }
 }
 
 void describe_signal(const spectrel_signal_t *signal)
@@ -33,14 +46,12 @@ static spectrel_signal_t *make_empty_signal(const size_t num_samples)
 {
     fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
 
-    // Handle if the memory allocation fails.
     if (!samples)
     {
         return NULL;
     }
     spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
 
-    // Handle if the memory allocation fails.
     if (!signal)
     {
         fftw_free(samples);
@@ -65,7 +76,6 @@ spectrel_signal_t *make_cosine_signal(const size_t num_samples,
 {
     fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
 
-    // Handle if the memory allocation failed.
     if (!samples)
     {
         return NULL;
@@ -82,6 +92,13 @@ spectrel_signal_t *make_cosine_signal(const size_t num_samples,
     }
 
     spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
+
+    if (!signal)
+    {
+        fftw_free(samples);
+        return NULL;
+    }
+
     signal->num_samples = num_samples;
     signal->samples = samples;
     return signal;
@@ -92,7 +109,6 @@ spectrel_signal_t *make_constant_signal(const size_t num_samples,
 {
     fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
 
-    // Handle if the memory allocation failed.
     if (!samples)
     {
         return NULL;
@@ -106,6 +122,13 @@ spectrel_signal_t *make_constant_signal(const size_t num_samples,
     }
 
     spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
+
+    if (!signal)
+    {
+        fftw_free(samples);
+        return NULL;
+    }
+
     signal->num_samples = num_samples;
     signal->samples = samples;
     return signal;
@@ -148,22 +171,38 @@ static spectrel_spectrogram_t *
 make_empty_spectrogram(const size_t num_spectrums,
                        const size_t num_samples_per_spectrum)
 {
+    spectrel_spectrogram_t *spectrogram =
+        malloc(sizeof(spectrel_spectrogram_t));
+    if (!spectrogram)
+    {
+        return NULL;
+    }
+
+    double *times = malloc(sizeof(double) * num_spectrums);
+    if (!times)
+    {
+        free(spectrogram);
+        return NULL;
+    }
+
+    double *frequencies = malloc(sizeof(double) * num_samples_per_spectrum);
+    if (!frequencies)
+    {
+        free(spectrogram);
+        free(times);
+        return NULL;
+    }
+
     fftw_complex *samples =
         malloc(sizeof(fftw_complex) * num_samples_per_spectrum * num_spectrums);
-    double *times = malloc(sizeof(double) * num_spectrums);
-    double *frequencies = malloc(sizeof(double) * num_samples_per_spectrum);
-
-    // Handle if any of the memory allocation failed.
-    if (!samples || !times || !frequencies)
+    if (!samples)
     {
-        free(samples);
+        free(spectrogram);
         free(times);
         free(frequencies);
         return NULL;
     }
 
-    spectrel_spectrogram_t *spectrogram =
-        malloc(sizeof(spectrel_spectrogram_t));
     spectrogram->num_spectrums = num_spectrums;
     spectrogram->num_samples_per_spectrum = num_samples_per_spectrum;
     spectrogram->samples = samples;
@@ -172,18 +211,46 @@ make_empty_spectrogram(const size_t num_spectrums,
     return spectrogram;
 }
 
-void free_spectrogram(spectrel_spectrogram_t *spectrogram)
+void free_spectrogram(spectrel_spectrogram_t *s)
 {
-    free(spectrogram->samples);
-    free(spectrogram->times);
-    free(spectrogram->frequencies);
-    free(spectrogram);
+    if (s)
+    {
+        if (s->samples)
+        {
+            free(s->samples);
+            s->samples = NULL;
+        }
+
+        if (s->times)
+        {
+            free(s->times);
+            s->times = NULL;
+        }
+
+        if (s->frequencies)
+        {
+            free(s->frequencies);
+            s->frequencies = NULL;
+        }
+
+        if (s->num_samples_per_spectrum != 0)
+        {
+            s->num_samples_per_spectrum = 0;
+        }
+
+        if (s->num_spectrums != 0)
+        {
+            s->num_spectrums = 0;
+        }
+
+        free(s);
+    }
 }
 
 static void compute_times(double *times,
-                           const size_t num_spectrums,
-                           const double sample_rate,
-                           const size_t window_hop)
+                          const size_t num_spectrums,
+                          const double sample_rate,
+                          const size_t window_hop)
 {
     for (size_t n = 0; n < num_spectrums; n++)
     {
@@ -192,8 +259,8 @@ static void compute_times(double *times,
 }
 
 static void compute_frequencies(double *frequencies,
-                                 const size_t num_samples_per_spectrum,
-                                 const double sample_rate)
+                                const size_t num_samples_per_spectrum,
+                                const double sample_rate)
 {
     size_t M = num_samples_per_spectrum;
     for (size_t m = 0; m < M; m++)
