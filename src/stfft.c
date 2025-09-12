@@ -194,7 +194,7 @@ make_empty_spectrogram(const size_t num_spectrums,
     }
 
     fftw_complex *samples =
-        malloc(sizeof(fftw_complex) * num_samples_per_spectrum * num_spectrums);
+        fftw_malloc(sizeof(fftw_complex) * num_samples_per_spectrum * num_spectrums);
     if (!samples)
     {
         free(spectrogram);
@@ -217,7 +217,7 @@ void free_spectrogram(spectrel_spectrogram_t *s)
     {
         if (s->samples)
         {
-            free(s->samples);
+            fftw_free(s->samples);
             s->samples = NULL;
         }
 
