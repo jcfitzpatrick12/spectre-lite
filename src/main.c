@@ -56,18 +56,8 @@ int main(int argc, char *argv[])
         goto cleanup;
     }
 
-    // Initialise the buffer.
-    const size_t buffer_size = window_size;
-    buffer = make_buffer(buffer_size);
-
-    if (!buffer)
-    {
-        state = SPECTREL_STATE_FAILURE;
-        goto cleanup;
-    }
-
-    // Plan the DFT.
-    fftw_plan p = make_plan(buffer);
+    // Initialise the plan.
+    spectrel_plan p = make_plan(window_size);
 
     if (!p)
     {
@@ -75,9 +65,9 @@ int main(int argc, char *argv[])
         goto cleanup;
     }
 
-    // Execute the DFT.
+    // Execute the short-time discrete fourier transform.
     spectrel_spectrogram_t *s =
-        stfft(p, buffer, window, signal, window_hop, sample_rate);
+        stfft(p, window, signal, window_hop, sample_rate);
 
     if (!s)
     {
@@ -109,7 +99,7 @@ cleanup:
 
     if (p)
     {
-        fftw_destroy_plan(p);
+        destroy_plan(p);
         p = NULL;
     }
 

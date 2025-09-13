@@ -83,6 +83,7 @@ static void constant_signal_generator(fftw_complex *samples,
     for (size_t n = 0; n < num_samples; n++)
     {
         samples[n][0] = constant_params->value;
+        samples[n][1] = 0.;
     }
 }
 
@@ -135,18 +136,69 @@ spectrel_signal_t *make_signal(const size_t num_samples,
     return generate_signal(num_samples, signal_generator, params);
 }
 
-spectrel_signal_t *make_buffer(const size_t num_samples)
+static spectrel_signal_t *make_buffer(const size_t num_samples)
 {
     return make_signal(num_samples, SPECTREL_EMPTY_SIGNAL, SPECTREL_NO_PARAMS);
 }
 
-fftw_plan make_plan(spectrel_signal_t *buffer)
+struct spectrel_plan_t
 {
-    return fftw_plan_dft_1d(buffer->num_samples,
-                            buffer->samples,
-                            buffer->samples,
-                            FFTW_FORWARD,
-                            FFTW_ESTIMATE);
+    spectrel_signal_t *buffer;
+    fftw_plan plan;
+};
+
+spectrel_plan make_plan(const size_t buffer_size)
+{
+    spectrel_signal_t *buffer = make_buffer(buffer_size);
+    if (!buffer)
+    {
+        return NULL;
+    }
+
+    fftw_plan p = fftw_plan_dft_1d(buffer->num_samples,
+                                   buffer->samples,
+                                   buffer->samples,
+                                   FFTW_FORWARD,
+                                   FFTW_ESTIMATE);
+
+    if (!p)
+    {
+        free_signal(buffer);
+        return NULL;
+    }
+
+    struct spectrel_plan_t *spectrel_plan =
+        malloc(sizeof(struct spectrel_plan_t));
+
+    if (!spectrel_plan)
+    {
+        fftw_destroy_plan(p);
+        free_signal(buffer);
+        return NULL;
+    }
+
+    spectrel_plan->buffer = buffer;
+    spectrel_plan->plan = p;
+    return spectrel_plan;
+}
+
+void destroy_plan(spectrel_plan p)
+{
+    if (p)
+    {
+        if (p->plan)
+        {
+            fftw_destroy_plan(p->plan);
+            p->plan = NULL;
+        }
+
+        if (p->buffer)
+        {
+            free_signal(p->buffer);
+            p->buffer = NULL;
+        }
+        free(p);
+    }
 }
 
 static spectrel_spectrogram_t *
@@ -258,8 +310,7 @@ static void compute_frequencies(double *frequencies,
     }
 }
 
-spectrel_spectrogram_t *stfft(const fftw_plan p,
-                              spectrel_signal_t *buffer,
+spectrel_spectrogram_t *stfft(spectrel_plan p,
                               const spectrel_signal_t *window,
                               const spectrel_signal_t *signal,
                               const size_t window_hop,
@@ -268,7 +319,7 @@ spectrel_spectrogram_t *stfft(const fftw_plan p,
 
     size_t window_size = window->num_samples;
     size_t window_midpoint = window_size / 2;
-    size_t buffer_size = buffer->num_samples;
+    size_t buffer_size = p->buffer->num_samples;
     size_t signal_size = signal->num_samples;
 
     // The buffer must be the same size as the window.
@@ -324,14 +375,14 @@ spectrel_spectrogram_t *stfft(const fftw_plan p,
         {
             if (signal_index < 0 || signal_index >= signal_size)
             {
-                buffer->samples[m][0] = 0;
-                buffer->samples[m][1] = 0;
+                p->buffer->samples[m][0] = 0;
+                p->buffer->samples[m][1] = 0;
             }
             else
             {
-                buffer->samples[m][0] =
+                p->buffer->samples[m][0] =
                     signal->samples[signal_index][0] * window->samples[m][0];
-                buffer->samples[m][1] =
+                p->buffer->samples[m][1] =
                     signal->samples[signal_index][1] * window->samples[m][1];
             }
 
@@ -339,11 +390,11 @@ spectrel_spectrogram_t *stfft(const fftw_plan p,
         }
 
         // Execute the DFT.
-        fftw_execute(p);
+        fftw_execute(p->plan);
 
         // Copy the result into the spectrogram.
         memcpy(s->samples + n * num_samples_per_spectrum,
-               buffer->samples,
+               p->buffer->samples,
                sizeof(fftw_complex) * buffer_size);
 
         // Reset the signal index then hop the window forward.

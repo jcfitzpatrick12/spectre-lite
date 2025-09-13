@@ -95,23 +95,23 @@ spectrel_signal_t *make_signal(const size_t num_samples,
                                void *params);
 
 /**
- * @brief Create an empty, memory-aligned buffer for repeated in-place DFTs by
- * FFTW.
- * @param num_samples The size of the buffer.
- * @return An empty signal.
+ * @brief An opaque structure encapsulating the information to carry out an
+ * in-place 1D DFT on a buffer.
  */
-spectrel_signal_t *make_buffer(const size_t num_samples);
+typedef struct spectrel_plan_t *spectrel_plan;
 
 /**
- * @brief Plan a 1D, in-place DFT on a buffer.
- *
- * The buffer should be initialised with samples only after creating the plan.
- *
- * @param buffer An empty, uninitialised buffer on which the DFT will be
- * performed.
- * @return The FFTW plan.
+ * @brief Plan an in-place 1D DFT on a buffer.
+ * @param buffer_size The number of samples in the buffer.
+ * @return The plan.
  */
-fftw_plan make_plan(spectrel_signal_t *buffer);
+spectrel_plan make_plan(const size_t buffer_size);
+
+/**
+ * @brief Free all resources allocated by a plan.
+ * @param The plan to destroy.
+ */
+void destroy_plan(spectrel_plan p);
 
 /**
  * @brief Compute the short-time discrete Fourier transform of the input signal
@@ -128,8 +128,7 @@ fftw_plan make_plan(spectrel_signal_t *buffer);
  * @param sample_rate The sample rate of the signal.
  * @return A spectrogram containing the amplitude of each spectral component.
  */
-spectrel_spectrogram_t *stfft(fftw_plan p,
-                              spectrel_signal_t *buffer,
+spectrel_spectrogram_t *stfft(spectrel_plan p,
                               const spectrel_signal_t *window,
                               const spectrel_signal_t *signal,
                               const size_t window_hop,
