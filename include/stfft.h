@@ -14,12 +14,45 @@ typedef struct
 } spectrel_signal_t;
 
 /**
- * A supported window type.
+ * A supported signal type.
  */
 typedef enum
 {
-    BOXCAR
-} spectrel_window_type_t;
+    SPECTREL_EMPTY_SIGNAL,
+    SPECTREL_CONSTANT_SIGNAL,
+    SPECTREL_COSINE_SIGNAL,
+} spectrel_signal_type_t;
+
+/**
+ * @brief Indicate that no parameters are required.
+ */
+typedef struct
+{
+
+} spectrel_no_params_t;
+
+// Indicate that no parameters are required.
+#define SPECTREL_NO_PARAMS NULL
+
+/**
+ * @brief Parameters for cosine signals.
+ */
+typedef struct
+{
+    double sample_rate;
+    double frequency;
+    double amplitude;
+    double phase;
+
+} spectrel_cosine_params_t;
+
+/**
+ * @brief Parameters for constant signals.
+ */
+typedef struct
+{
+    double value;
+} spectrel_constant_params_t;
 
 /**
  * @brief The spectrogram of a signal in units of DFT amplitude.
@@ -51,45 +84,23 @@ void describe_signal(const spectrel_signal_t *signal);
 void free_signal(spectrel_signal_t *signal);
 
 /**
+ * @brief Generate a discrete, complex-valued signal.
+ * @param num_samples The number of samples to take.
+ * @param signal_type The type of the signal to generate
+ * @param params Configurable parameters for the specified signal type.
+ * @return The signal.
+ */
+spectrel_signal_t *make_signal(const size_t num_samples,
+                               const spectrel_signal_type_t signal_type,
+                               void *params);
+
+/**
  * @brief Create an empty, memory-aligned buffer for repeated in-place DFTs by
  * FFTW.
  * @param num_samples The size of the buffer.
  * @return An empty signal.
  */
 spectrel_signal_t *make_buffer(const size_t num_samples);
-
-/**
- * @brief Sample a complex-valued cosine wave.
- * @param num_samples The number of samples to take.
- * @param sample_rate The rate at which to take samples.
- * @param frequency The frequency of the cosine wave.
- * @param amplitude The amplitude of the cosine wave.
- * @param phase The initial phase of the cosine wave.
- * @return The cosine wave signal.
- */
-spectrel_signal_t *make_cosine_signal(const size_t num_samples,
-                                      const double sample_rate,
-                                      const double frequency,
-                                      const double amplitude,
-                                      const double phase);
-
-/**
- * @brief Generate a real-valued constant signal.
- * @param value The value of the real component of each sample in the signal.
- * @return A signal where each sample's real part is set to the given value and
- * the imaginary part is zero.
- */
-spectrel_signal_t *make_constant_signal(const size_t num_samples,
-                                        const double value);
-
-/**
- * @brief Create a window of a specified type and length.
- * @param window_type The type of the window.
- * @param num_samples The number of samples in the window.
- * @return The window signal.
- */
-spectrel_signal_t *make_window(const spectrel_window_type_t window_type,
-                               const size_t num_samples);
 
 /**
  * @brief Plan a 1D, in-place DFT on a buffer.

@@ -1,75 +1,92 @@
 #include "spectrel.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-int exit_failure(const char *msg)
-{
-    fprintf(stderr, "%s\n", msg);
-    return EXIT_FAILURE;
-}
-
 int exit_success()
 {
     return EXIT_SUCCESS;
 }
 
+int exit_failure()
+{
+    fprintf(stderr, "An unexpected error has occured.\n");
+    return EXIT_FAILURE;
+}
+
+typedef enum
+{
+    SPECTREL_STATE_FAILURE,
+    SPECTREL_STATE_OK,
+} spectrel_state_t;
+
 int main(int argc, char *argv[])
 {
-    // Initialise program status.
-    int status = EXIT_FAILURE;
+    // Track program state.
+    spectrel_state_t state = SPECTREL_STATE_OK;
 
     // Initialise pointers.
     spectrel_signal_t *signal = NULL;
     spectrel_signal_t *window = NULL;
     spectrel_signal_t *buffer = NULL;
-    fftw_plan p = NULL;
-    spectrel_spectrogram_t *s = NULL;
 
-    // Initialise the input signal.
+    // Initialise the cosine wave.
     const size_t num_samples = 32;
     const double sample_rate = 8;
+    const double amplitude = 1;
     const double frequency = 1;
-    const double amplitude = 1.0;
-    const double phase = 0.0;
-    signal = make_cosine_signal(
-        num_samples, sample_rate, frequency, amplitude, phase);
+    const double phase = 0;
+    spectrel_cosine_params_t cosine_params = {
+        sample_rate, frequency, amplitude, phase};
+    signal = make_signal(num_samples, SPECTREL_COSINE_SIGNAL, &cosine_params);
 
     if (!signal)
+    {
+        state = SPECTREL_STATE_FAILURE;
         goto cleanup;
+    }
 
     // Initialise the window.
     const size_t window_size = 8;
     const size_t window_hop = 8;
-    const spectrel_window_type_t window_type = BOXCAR;
-    window = make_window(window_type, window_size);
+    spectrel_constant_params_t constant_params = {1};
+    window =
+        make_signal(window_size, SPECTREL_CONSTANT_SIGNAL, &constant_params);
 
     if (!window)
+    {
+        state = SPECTREL_STATE_FAILURE;
         goto cleanup;
+    }
 
-    // Initialise the buffer (same size as the window.)
+    // Initialise the buffer.
     const size_t buffer_size = window_size;
     buffer = make_buffer(buffer_size);
 
     if (!buffer)
+    {
+        state = SPECTREL_STATE_FAILURE;
         goto cleanup;
+    }
 
-    // Plan an in-place DFT on the buffer.
-    p = make_plan(buffer);
+    // Plan the DFT.
+    fftw_plan p = make_plan(buffer);
+
     if (!p)
+    {
+        state = SPECTREL_STATE_FAILURE;
         goto cleanup;
+    }
 
-    // Compute the spectrogram.
-    s = stfft(p, buffer, window, signal, window_hop, sample_rate);
+    // Execute the DFT.
+    spectrel_spectrogram_t *s =
+        stfft(p, buffer, window, signal, window_hop, sample_rate);
+
     if (!s)
+    {
+        state = SPECTREL_STATE_FAILURE;
         goto cleanup;
+    }
 
-    // Print it's properties.
+    // Print spectrogram properties.
     describe_spectrogram(s);
-
-    // The program has succeeded.
-    status = EXIT_SUCCESS;
 
 cleanup:
     if (signal)
@@ -102,6 +119,5 @@ cleanup:
         s = NULL;
     }
 
-    return (!status) ? exit_success()
-                     : exit_failure("An unexpected error has occured.");
+    return (state == SPECTREL_STATE_OK) ? exit_success() : exit_failure();
 }

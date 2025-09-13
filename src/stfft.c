@@ -2,7 +2,7 @@
 
 #include <fftw3.h>
 #include <math.h>
-#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void free_signal(spectrel_signal_t *s)
@@ -42,70 +42,54 @@ void describe_signal(const spectrel_signal_t *signal)
     }
 }
 
-static spectrel_signal_t *make_empty_signal(const size_t num_samples)
+// Parameterised callback to initialise the signal samples.
+typedef void (*spectrel_signal_generator_t)(fftw_complex *samples,
+                                            const size_t num_samples,
+                                            void *params);
+
+static void empty_signal_generator(fftw_complex *samples,
+                                   const size_t num_samples,
+                                   void *params)
 {
-    fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
-
-    if (!samples)
-    {
-        return NULL;
-    }
-    spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
-
-    if (!signal)
-    {
-        fftw_free(samples);
-        return NULL;
-    }
-
-    signal->num_samples = num_samples;
-    signal->samples = samples;
-    return signal;
+    // Noop.
+    return;
 }
 
-spectrel_signal_t *make_buffer(const size_t num_samples)
+static void cosine_signal_generator(fftw_complex *samples,
+                                    const size_t num_samples,
+                                    void *params)
 {
-    return make_empty_signal(num_samples);
-}
-
-spectrel_signal_t *make_cosine_signal(const size_t num_samples,
-                                      const double sample_rate,
-                                      const double frequency,
-                                      const double amplitude,
-                                      const double phase)
-{
-    fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
-
-    if (!samples)
-    {
-        return NULL;
-    }
-
-    // Initialise the sample values.
+    spectrel_cosine_params_t *cosine_params =
+        (spectrel_cosine_params_t *)params;
     for (size_t n = 0; n < num_samples; n++)
     {
-        double arg = 2 * M_PI * (frequency / sample_rate) * (double)(n) + phase;
-        samples[n][0] = amplitude * cos(arg);
+        double arg =
+            2 * M_PI * (cosine_params->frequency / cosine_params->sample_rate) *
+                (double)(n) +
+            cosine_params->phase;
+        samples[n][0] = cosine_params->amplitude * cos(arg);
 
         // Zero the imaginary component.
         samples[n][1] = 0;
     }
-
-    spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
-
-    if (!signal)
-    {
-        fftw_free(samples);
-        return NULL;
-    }
-
-    signal->num_samples = num_samples;
-    signal->samples = samples;
-    return signal;
 }
 
-spectrel_signal_t *make_constant_signal(const size_t num_samples,
-                                        const double value)
+static void constant_signal_generator(fftw_complex *samples,
+                                      const size_t num_samples,
+                                      void *params)
+{
+    spectrel_constant_params_t *constant_params =
+        (spectrel_constant_params_t *)params;
+    for (size_t n = 0; n < num_samples; n++)
+    {
+        samples[n][0] = constant_params->value;
+    }
+}
+
+static spectrel_signal_t *
+generate_signal(const size_t num_samples,
+                spectrel_signal_generator_t signal_generator,
+                void *params)
 {
     fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
 
@@ -114,48 +98,46 @@ spectrel_signal_t *make_constant_signal(const size_t num_samples,
         return NULL;
     }
 
-    // Initialise the sample values.
-    for (size_t n = 0; n < num_samples; n++)
-    {
-        samples[n][0] = value;
-        samples[n][1] = 0.0;
-    }
-
     spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
-
     if (!signal)
     {
         fftw_free(samples);
         return NULL;
     }
 
+    signal_generator(samples, num_samples, params);
+
     signal->num_samples = num_samples;
     signal->samples = samples;
     return signal;
 }
 
-static spectrel_signal_t *make_boxcar_window(const size_t num_samples)
+spectrel_signal_t *make_signal(const size_t num_samples,
+                               const spectrel_signal_type_t signal_type,
+                               void *params)
 {
-    return make_constant_signal(num_samples, 1.0);
-}
-
-spectrel_signal_t *make_window(spectrel_window_type_t window_type,
-                               const size_t num_samples)
-{
-    spectrel_signal_t *(*signal_generator)(const size_t num_samples);
-
-    if (window_type == BOXCAR)
+    spectrel_signal_generator_t signal_generator;
+    switch (signal_type)
     {
-        signal_generator = &make_boxcar_window;
-    }
-
-    // Handle if the window type has not been implemented.
-    else
-    {
+    case SPECTREL_EMPTY_SIGNAL:
+        signal_generator = &empty_signal_generator;
+        break;
+    case SPECTREL_COSINE_SIGNAL:
+        signal_generator = &cosine_signal_generator;
+        break;
+    case SPECTREL_CONSTANT_SIGNAL:
+        signal_generator = &constant_signal_generator;
+        break;
+    default:
         return NULL;
     }
 
-    return signal_generator(num_samples);
+    return generate_signal(num_samples, signal_generator, params);
+}
+
+spectrel_signal_t *make_buffer(const size_t num_samples)
+{
+    return make_signal(num_samples, SPECTREL_EMPTY_SIGNAL, SPECTREL_NO_PARAMS);
 }
 
 fftw_plan make_plan(spectrel_signal_t *buffer)
@@ -193,8 +175,8 @@ make_empty_spectrogram(const size_t num_spectrums,
         return NULL;
     }
 
-    fftw_complex *samples =
-        fftw_malloc(sizeof(fftw_complex) * num_samples_per_spectrum * num_spectrums);
+    fftw_complex *samples = fftw_malloc(
+        sizeof(fftw_complex) * num_samples_per_spectrum * num_spectrums);
     if (!samples)
     {
         free(spectrogram);
@@ -332,16 +314,15 @@ spectrel_spectrogram_t *stfft(const fftw_plan p,
     compute_times(s->times, num_spectrums, sample_rate, window_hop);
 
     // Initialise the window such that it's mid-point is at sample index 0.
-    int start = -1 * window_midpoint;
-    int end = start + window_size;
+    int signal_index = -1 * window_midpoint;
 
     for (size_t n = 0; n < num_spectrums; n++)
     {
+        // Copy the samples for the current window into the buffer.
+        // (The signal is assumed to be zero if the window dangles).
         for (size_t m = 0; m < window_size; m++)
         {
-            // Copy the samples for the current window into the buffer.
-            // (The signal is assumed to be zero if the window dangles).
-            if (start + m < 0)
+            if (signal_index < 0 || signal_index >= signal_size)
             {
                 buffer->samples[m][0] = 0;
                 buffer->samples[m][1] = 0;
@@ -349,10 +330,12 @@ spectrel_spectrogram_t *stfft(const fftw_plan p,
             else
             {
                 buffer->samples[m][0] =
-                    signal->samples[start + m][0] * window->samples[m][0];
+                    signal->samples[signal_index][0] * window->samples[m][0];
                 buffer->samples[m][1] =
-                    signal->samples[start + m][1] * window->samples[m][1];
+                    signal->samples[signal_index][1] * window->samples[m][1];
             }
+
+            signal_index += 1;
         }
 
         // Execute the DFT.
@@ -363,9 +346,8 @@ spectrel_spectrogram_t *stfft(const fftw_plan p,
                buffer->samples,
                sizeof(fftw_complex) * buffer_size);
 
-        // Hop the window forward.
-        start += window_hop;
-        end += window_hop;
+        // Reset the signal index then hop the window forward.
+        signal_index = (signal_index - window_size) + window_hop;
     }
     return s;
 }
