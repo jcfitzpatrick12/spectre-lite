@@ -99,7 +99,7 @@ cleanup:
 
     if (p)
     {
-        destroy_plan(p);
+        free_plan(p);
         p = NULL;
     }
 

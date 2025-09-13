@@ -111,7 +111,7 @@ spectrel_plan make_plan(const size_t buffer_size);
  * @brief Free all resources allocated by a plan.
  * @param The plan to destroy.
  */
-void destroy_plan(spectrel_plan p);
+void free_plan(spectrel_plan p);
 
 /**
  * @brief Compute the short-time discrete Fourier transform of the input signal

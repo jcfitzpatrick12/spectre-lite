@@ -182,7 +182,7 @@ spectrel_plan make_plan(const size_t buffer_size)
     return spectrel_plan;
 }
 
-void destroy_plan(spectrel_plan p)
+void free_plan(spectrel_plan p)
 {
     if (p)
     {
