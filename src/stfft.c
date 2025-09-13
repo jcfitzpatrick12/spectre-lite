@@ -313,7 +313,7 @@ spectrel_spectrogram_t *stfft(const fftw_plan p,
     // Assign physical times to each spectrum in the spectrogram.
     compute_times(s->times, num_spectrums, sample_rate, window_hop);
 
-    // Initialise the window such that it's mid-point is at sample index 0.
+    // Initialise the window such that it's mid-point is at signal index 0.
     int signal_index = -1 * window_midpoint;
 
     for (size_t n = 0; n < num_spectrums; n++)
