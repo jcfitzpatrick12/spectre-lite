@@ -8,6 +8,7 @@ Record spectrograms with [SoapySDR](https://github.com/pothosware/SoapySDR) and 
 ### Prerequisites
 
 - [FFTW3](https://www.fftw.org/)
+- [SoapySDR](https://github.com/pothosware/SoapySDR)
 
 ### Installation
 
