@@ -1,30 +1,13 @@
 #include "stfft.h"
+#include "constants.h"
 
+#include <complex.h>
 #include <fftw3.h>
 #include <math.h>
+#include <memory.h>
 #include <stdlib.h>
-#include <string.h>
 
-void free_signal(spectrel_signal_t *s)
-{
-    if (s)
-    {
-        if (s->samples)
-        {
-            fftw_free(s->samples);
-            s->samples = NULL;
-        }
-
-        if (s->num_samples != 0)
-        {
-            s->num_samples = 0;
-        }
-
-        free(s);
-    }
-}
-
-void describe_signal(const spectrel_signal_t *signal)
+void spectrel_describe_signal(const spectrel_signal_t *signal)
 {
     printf("Number of samples: %zu\n", signal->num_samples);
 
@@ -38,7 +21,28 @@ void describe_signal(const spectrel_signal_t *signal)
     printf("Samples:\n");
     for (size_t n = 0; n < signal->num_samples; n++)
     {
-        printf("  %f + %fi\n", signal->samples[n][0], signal->samples[n][1]);
+        printf("  %f + %fi\n",
+               creal(signal->samples[n]),
+               cimag(signal->samples[n]));
+    }
+}
+
+void spectrel_free_signal(spectrel_signal_t *signal)
+{
+    if (signal)
+    {
+        if (signal->samples)
+        {
+            fftw_free(signal->samples);
+            signal->samples = NULL;
+        }
+
+        if (signal->num_samples != 0)
+        {
+            signal->num_samples = 0;
+        }
+
+        free(signal);
     }
 }
 
@@ -47,62 +51,66 @@ typedef void (*spectrel_signal_generator_t)(fftw_complex *samples,
                                             const size_t num_samples,
                                             void *params);
 
-static void empty_signal_generator(fftw_complex *samples,
-                                   const size_t num_samples,
-                                   void *params)
+static void spectrel_empty_signal_generator(fftw_complex *samples,
+                                            const size_t num_samples,
+                                            void *params)
 {
     // Noop.
     return;
 }
 
-static void cosine_signal_generator(fftw_complex *samples,
-                                    const size_t num_samples,
-                                    void *params)
+static void spectrel_cosine_signal_generator(fftw_complex *samples,
+                                             const size_t num_samples,
+                                             void *params)
 {
+    // Use defaults if no parameters are initialised.
+    spectrel_cosine_params_t default_params = {
+        .amplitude = 1.0, .frequency = 1.0, .phase = 0.0, .sample_rate = 8};
+
     spectrel_cosine_params_t *cosine_params =
-        (spectrel_cosine_params_t *)params;
+        params ? (spectrel_cosine_params_t *)params : &default_params;
+
     for (size_t n = 0; n < num_samples; n++)
     {
         double arg =
             2 * M_PI * (cosine_params->frequency / cosine_params->sample_rate) *
                 (double)(n) +
             cosine_params->phase;
-        samples[n][0] = cosine_params->amplitude * cos(arg);
-
-        // Zero the imaginary component.
-        samples[n][1] = 0;
+        samples[n] = cosine_params->amplitude * cos(arg) + 0 * I;
     }
 }
 
-static void constant_signal_generator(fftw_complex *samples,
-                                      const size_t num_samples,
-                                      void *params)
+static void spectrel_constant_signal_generator(fftw_complex *samples,
+                                               const size_t num_samples,
+                                               void *params)
 {
+    spectrel_constant_params_t default_params = {.value = 1.0};
     spectrel_constant_params_t *constant_params =
-        (spectrel_constant_params_t *)params;
+        (params) ? (spectrel_constant_params_t *)(params) : &default_params;
+
     for (size_t n = 0; n < num_samples; n++)
     {
-        samples[n][0] = constant_params->value;
-        samples[n][1] = 0.;
+        samples[n] = constant_params->value + 0 * I;
     }
 }
 
 static spectrel_signal_t *
-generate_signal(const size_t num_samples,
-                spectrel_signal_generator_t signal_generator,
-                void *params)
+spectrel_generate_signal(const size_t num_samples,
+                         spectrel_signal_generator_t signal_generator,
+                         void *params)
 {
-    fftw_complex *samples = fftw_malloc(sizeof(fftw_complex) * num_samples);
+    fftw_complex *samples = fftw_malloc(sizeof(*samples) * num_samples);
 
     if (!samples)
     {
         return NULL;
     }
 
-    spectrel_signal_t *signal = malloc(sizeof(spectrel_signal_t));
+    spectrel_signal_t *signal = malloc(sizeof(*signal));
     if (!signal)
     {
         fftw_free(samples);
+        samples = NULL;
         return NULL;
     }
 
@@ -113,32 +121,33 @@ generate_signal(const size_t num_samples,
     return signal;
 }
 
-spectrel_signal_t *make_signal(const size_t num_samples,
-                               const spectrel_signal_type_t signal_type,
-                               void *params)
+spectrel_signal_t *
+spectrel_make_signal(const size_t num_samples,
+                     const spectrel_signal_type_t signal_type,
+                     void *params)
 {
     spectrel_signal_generator_t signal_generator;
     switch (signal_type)
     {
     case SPECTREL_EMPTY_SIGNAL:
-        signal_generator = &empty_signal_generator;
+        signal_generator = &spectrel_empty_signal_generator;
         break;
     case SPECTREL_COSINE_SIGNAL:
-        signal_generator = &cosine_signal_generator;
+        signal_generator = &spectrel_cosine_signal_generator;
         break;
     case SPECTREL_CONSTANT_SIGNAL:
-        signal_generator = &constant_signal_generator;
+        signal_generator = &spectrel_constant_signal_generator;
         break;
     default:
         return NULL;
     }
 
-    return generate_signal(num_samples, signal_generator, params);
+    return spectrel_generate_signal(num_samples, signal_generator, params);
 }
 
-static spectrel_signal_t *make_buffer(const size_t num_samples)
+static spectrel_signal_t *spectrel_make_buffer(const size_t num_samples)
 {
-    return make_signal(num_samples, SPECTREL_EMPTY_SIGNAL, SPECTREL_NO_PARAMS);
+    return spectrel_make_signal(num_samples, SPECTREL_EMPTY_SIGNAL, NULL);
 }
 
 struct spectrel_plan_t
@@ -147,9 +156,28 @@ struct spectrel_plan_t
     fftw_plan plan;
 };
 
-spectrel_plan make_plan(const size_t buffer_size)
+void spectrel_free_plan(spectrel_plan p)
 {
-    spectrel_signal_t *buffer = make_buffer(buffer_size);
+    if (p)
+    {
+        if (p->plan)
+        {
+            fftw_destroy_plan(p->plan);
+            p->plan = NULL;
+        }
+
+        if (p->buffer)
+        {
+            spectrel_free_signal(p->buffer);
+            p->buffer = NULL;
+        }
+        free(p);
+    }
+}
+
+spectrel_plan spectrel_make_plan(const size_t buffer_size)
+{
+    spectrel_signal_t *buffer = spectrel_make_buffer(buffer_size);
     if (!buffer)
     {
         return NULL;
@@ -163,17 +191,21 @@ spectrel_plan make_plan(const size_t buffer_size)
 
     if (!p)
     {
-        free_signal(buffer);
+        spectrel_free_signal(buffer);
+        buffer = NULL;
         return NULL;
     }
 
-    struct spectrel_plan_t *spectrel_plan =
-        malloc(sizeof(struct spectrel_plan_t));
+    struct spectrel_plan_t *spectrel_plan = malloc(sizeof(*spectrel_plan));
 
     if (!spectrel_plan)
     {
         fftw_destroy_plan(p);
-        free_signal(buffer);
+        p = NULL;
+
+        spectrel_free_signal(buffer);
+        buffer = NULL;
+
         return NULL;
     }
 
@@ -182,58 +214,50 @@ spectrel_plan make_plan(const size_t buffer_size)
     return spectrel_plan;
 }
 
-void free_plan(spectrel_plan p)
-{
-    if (p)
-    {
-        if (p->plan)
-        {
-            fftw_destroy_plan(p->plan);
-            p->plan = NULL;
-        }
-
-        if (p->buffer)
-        {
-            free_signal(p->buffer);
-            p->buffer = NULL;
-        }
-        free(p);
-    }
-}
-
 static spectrel_spectrogram_t *
-make_empty_spectrogram(const size_t num_spectrums,
-                       const size_t num_samples_per_spectrum)
+spectrel_make_empty_spectrogram(const size_t num_spectrums,
+                                const size_t num_samples_per_spectrum)
 {
-    spectrel_spectrogram_t *spectrogram =
-        malloc(sizeof(spectrel_spectrogram_t));
+    spectrel_spectrogram_t *spectrogram = malloc(sizeof(*spectrogram));
     if (!spectrogram)
     {
         return NULL;
     }
 
-    double *times = malloc(sizeof(double) * num_spectrums);
+    double *times = malloc(sizeof(*times) * num_spectrums);
     if (!times)
     {
         free(spectrogram);
+        spectrogram = NULL;
         return NULL;
     }
 
-    double *frequencies = malloc(sizeof(double) * num_samples_per_spectrum);
+    double *frequencies =
+        malloc(sizeof(*frequencies) * num_samples_per_spectrum);
     if (!frequencies)
     {
+
         free(spectrogram);
+        spectrogram = NULL;
+
         free(times);
+        times = NULL;
         return NULL;
     }
 
     fftw_complex *samples = fftw_malloc(
-        sizeof(fftw_complex) * num_samples_per_spectrum * num_spectrums);
+        sizeof(*samples) * num_samples_per_spectrum * num_spectrums);
     if (!samples)
     {
         free(spectrogram);
+        spectrogram = NULL;
+
         free(times);
+        times = NULL;
+
         free(frequencies);
+        frequencies = NULL;
+
         return NULL;
     }
 
@@ -245,46 +269,46 @@ make_empty_spectrogram(const size_t num_spectrums,
     return spectrogram;
 }
 
-void free_spectrogram(spectrel_spectrogram_t *s)
+void spectrel_free_spectrogram(spectrel_spectrogram_t *spectrogram)
 {
-    if (s)
+    if (spectrogram)
     {
-        if (s->samples)
+        if (spectrogram->samples)
         {
-            fftw_free(s->samples);
-            s->samples = NULL;
+            fftw_free(spectrogram->samples);
+            spectrogram->samples = NULL;
         }
 
-        if (s->times)
+        if (spectrogram->times)
         {
-            free(s->times);
-            s->times = NULL;
+            free(spectrogram->times);
+            spectrogram->times = NULL;
         }
 
-        if (s->frequencies)
+        if (spectrogram->frequencies)
         {
-            free(s->frequencies);
-            s->frequencies = NULL;
+            free(spectrogram->frequencies);
+            spectrogram->frequencies = NULL;
         }
 
-        if (s->num_samples_per_spectrum != 0)
+        if (spectrogram->num_samples_per_spectrum != 0)
         {
-            s->num_samples_per_spectrum = 0;
+            spectrogram->num_samples_per_spectrum = 0;
         }
 
-        if (s->num_spectrums != 0)
+        if (spectrogram->num_spectrums != 0)
         {
-            s->num_spectrums = 0;
+            spectrogram->num_spectrums = 0;
         }
 
-        free(s);
+        free(spectrogram);
     }
 }
 
-static void compute_times(double *times,
-                          const size_t num_spectrums,
-                          const double sample_rate,
-                          const size_t window_hop)
+static void spectrel_compute_times(double *times,
+                                   const size_t num_spectrums,
+                                   const double sample_rate,
+                                   const size_t window_hop)
 {
     for (size_t n = 0; n < num_spectrums; n++)
     {
@@ -292,9 +316,9 @@ static void compute_times(double *times,
     }
 }
 
-static void compute_frequencies(double *frequencies,
-                                const size_t num_samples_per_spectrum,
-                                const double sample_rate)
+static void spectrel_compute_frequencies(double *frequencies,
+                                         const size_t num_samples_per_spectrum,
+                                         const double sample_rate)
 {
     size_t M = num_samples_per_spectrum;
     for (size_t m = 0; m < M; m++)
@@ -310,11 +334,39 @@ static void compute_frequencies(double *frequencies,
     }
 }
 
-spectrel_spectrogram_t *stfft(spectrel_plan p,
-                              const spectrel_signal_t *window,
-                              const spectrel_signal_t *signal,
-                              const size_t window_hop,
-                              const double sample_rate)
+void spectrel_describe_spectrogram(const spectrel_spectrogram_t *spectrogram)
+{
+    printf("Number of spectrums: %zu\n", spectrogram->num_spectrums);
+    printf("Number of samples per spectrum: %zu\n",
+           spectrogram->num_samples_per_spectrum);
+
+    // If there's no samples, early return since we don't have anything more to
+    // print.
+    if (!spectrogram->num_spectrums || !spectrogram->num_samples_per_spectrum)
+    {
+        return;
+    }
+
+    size_t N = spectrogram->num_spectrums;
+    size_t M = spectrogram->num_samples_per_spectrum;
+    for (size_t n = 0; n < N; n++)
+    {
+        printf("Time %.2f [s]:\n", spectrogram->times[n]);
+        for (size_t m = 0; m < M; m++)
+        {
+            printf("  %.2f [Hz]: %.2f + %.2fi\n",
+                   spectrogram->frequencies[m],
+                   creal(spectrogram->samples[n * M + m]),
+                   cimag(spectrogram->samples[n * M + m]));
+        }
+    }
+}
+
+spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
+                                       const spectrel_signal_t *window,
+                                       const spectrel_signal_t *signal,
+                                       const size_t window_hop,
+                                       const double sample_rate)
 {
 
     size_t window_size = window->num_samples;
@@ -322,21 +374,21 @@ spectrel_spectrogram_t *stfft(spectrel_plan p,
     size_t buffer_size = p->buffer->num_samples;
     size_t signal_size = signal->num_samples;
 
-    // The buffer must be the same size as the window.
     if (buffer_size != window_size)
     {
+        fprintf(stderr, "The buffer size must be the same size as the window.");
         return NULL;
     }
 
-    // The window must fit within the signal.
     if (window_size > signal_size)
     {
+        fprintf(stderr, "The window must fit within the signal.");
         return NULL;
     }
 
-    // The window size and hop must be at least one.
     if (window_size < 1 || window_hop < 1)
     {
+        fprintf(stderr, "The window size and hop must be at least one.");
         return NULL;
     }
 
@@ -349,8 +401,8 @@ spectrel_spectrogram_t *stfft(spectrel_plan p,
     size_t num_samples_per_spectrum = window_size;
 
     // Allocate memory for an empty spectrogram.
-    spectrel_spectrogram_t *s =
-        make_empty_spectrogram(num_spectrums, num_samples_per_spectrum);
+    spectrel_spectrogram_t *s = spectrel_make_empty_spectrogram(
+        num_spectrums, num_samples_per_spectrum);
 
     // Handle if the memory allocation fails
     if (!s)
@@ -359,10 +411,11 @@ spectrel_spectrogram_t *stfft(spectrel_plan p,
     }
 
     // Assign baseband frequencies to each spectral component.
-    compute_frequencies(s->frequencies, num_samples_per_spectrum, sample_rate);
+    spectrel_compute_frequencies(
+        s->frequencies, num_samples_per_spectrum, sample_rate);
 
     // Assign physical times to each spectrum in the spectrogram.
-    compute_times(s->times, num_spectrums, sample_rate, window_hop);
+    spectrel_compute_times(s->times, num_spectrums, sample_rate, window_hop);
 
     // Initialise the window such that it's mid-point is at signal index 0.
     int signal_index = -1 * window_midpoint;
@@ -375,15 +428,12 @@ spectrel_spectrogram_t *stfft(spectrel_plan p,
         {
             if (signal_index < 0 || signal_index >= signal_size)
             {
-                p->buffer->samples[m][0] = 0;
-                p->buffer->samples[m][1] = 0;
+                p->buffer->samples[m] = 0;
             }
             else
             {
-                p->buffer->samples[m][0] =
-                    signal->samples[signal_index][0] * window->samples[m][0];
-                p->buffer->samples[m][1] =
-                    signal->samples[signal_index][1] * window->samples[m][1];
+                p->buffer->samples[m] =
+                    signal->samples[signal_index] * window->samples[m];
             }
 
             signal_index += 1;
@@ -401,32 +451,4 @@ spectrel_spectrogram_t *stfft(spectrel_plan p,
         signal_index = (signal_index - window_size) + window_hop;
     }
     return s;
-}
-
-void describe_spectrogram(const spectrel_spectrogram_t *s)
-{
-    printf("Number of spectrums: %zu\n", s->num_spectrums);
-    printf("Number of samples per spectrum: %zu\n",
-           s->num_samples_per_spectrum);
-
-    // If there's no samples, early return since we don't have anything more to
-    // print.
-    if (!s->num_spectrums || !s->num_samples_per_spectrum)
-    {
-        return;
-    }
-
-    size_t N = s->num_spectrums;
-    size_t M = s->num_samples_per_spectrum;
-    for (size_t n = 0; n < N; n++)
-    {
-        printf("Time %.2f [s]:\n", s->times[n]);
-        for (size_t m = 0; m < M; m++)
-        {
-            printf("  %.2f [Hz]: %.2f + %.2fi\n",
-                   s->frequencies[m],
-                   s->samples[n * M + m][0],
-                   s->samples[n * M + m][1]);
-        }
-    }
 }

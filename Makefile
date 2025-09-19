@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Iinclude -lm -lfftw3
+CFLAGS=-Iinclude -lm -lfftw3 -lSoapySDR
 SRC=$(wildcard src/*.c)
 TARGET=spectrel
 
