@@ -1,113 +1,114 @@
 #include "spectrel.h"
 
-int exit_success()
-{
-    return EXIT_SUCCESS;
-}
+#include <stdio.h>
 
 int exit_failure()
 {
-    fprintf(stderr, "An unexpected error has occured.\n");
-    return EXIT_FAILURE;
+    fprintf(stderr, "An unexpected error occured.\n");
+    return SPECTREL_FAILURE;
 }
 
-typedef enum
+int exit_success()
 {
-    SPECTREL_STATE_FAILURE,
-    SPECTREL_STATE_OK,
-} spectrel_state_t;
+    printf("Done.\n");
+    return SPECTREL_SUCCESS;
+}
 
 int main(int argc, char *argv[])
 {
-    // Track program state.
-    spectrel_state_t state = SPECTREL_STATE_OK;
 
-    // Initialise pointers.
-    spectrel_signal_t *signal = NULL;
-    spectrel_signal_t *window = NULL;
+    // Initialise the program.
+    spectrel_receiver receiver = NULL;
+    spectrel_plan plan = NULL;
     spectrel_signal_t *buffer = NULL;
+    spectrel_signal_t *window = NULL;
+    spectrel_spectrogram_t *spectrogram = NULL;
+    int status = SPECTREL_FAILURE;
 
-    // Initialise the cosine wave.
-    const size_t num_samples = 32;
-    const double sample_rate = 8;
-    const double amplitude = 1;
-    const double frequency = 1;
-    const double phase = 0;
-    spectrel_cosine_params_t cosine_params = {
-        sample_rate, frequency, amplitude, phase};
-    signal = make_signal(num_samples, SPECTREL_COSINE_SIGNAL, &cosine_params);
+    // TODO: Specify configurable parameters via command line arguments.
+    // For now, hard-code them.
+    const char *name = "hackrf";
+    const double frequency = 95.8e6;
+    const double sample_rate = 2e6;
+    const double bandwidth = 2e6;
+    const double gain = 20;
+    const size_t buffer_size = 256;
+    const size_t window_size = 64;
+    const size_t window_hop = 64;
 
-    if (!signal)
-    {
-        state = SPECTREL_STATE_FAILURE;
+    // Initialise the receiver.
+    receiver =
+        spectrel_make_receiver(name, frequency, sample_rate, bandwidth, gain);
+
+    if (!receiver)
         goto cleanup;
-    }
 
-    // Initialise the window.
-    const size_t window_size = 8;
-    const size_t window_hop = 8;
-    spectrel_constant_params_t constant_params = {1};
-    window =
-        make_signal(window_size, SPECTREL_CONSTANT_SIGNAL, &constant_params);
+    if (spectrel_activate_stream(receiver) != 0)
+        goto cleanup;
 
+    // Create a reusable buffer ready to read samples from the receiver into.
+    buffer = spectrel_make_signal(
+        buffer_size, SPECTREL_EMPTY_SIGNAL, SPECTREL_NO_SIGNAL_PARAMS);
+    if (!buffer)
+        goto cleanup;
+
+    // Plan the short-time DFT.
+    plan = spectrel_make_plan(window_size);
+    if (!plan)
+        goto cleanup;
+
+    // Create the window.
+    // TODO: Generalise the window (right now, the boxcar window is enforced).
+    spectrel_constant_params_t window_params = {1.0};
+    window = spectrel_make_signal(
+        window_size, SPECTREL_CONSTANT_SIGNAL, (void *)&window_params);
     if (!window)
-    {
-        state = SPECTREL_STATE_FAILURE;
         goto cleanup;
+
+    // Stream samples into the buffer, then apply the short-time DFT.
+    // TODO: Make the duration of capture configurable, keeping track
+    // of elapsed time via sample counting. For now, it's hard-coded.
+    for (size_t n = 0; n < 10; n++)
+    {
+        if (spectrel_read_stream(receiver, buffer) != 0)
+            goto cleanup;
+        spectrogram =
+            spectrel_stfft(plan, window, buffer, window_hop, sample_rate);
+        if (!spectrogram)
+            goto cleanup;
     }
 
-    // Initialise the plan.
-    spectrel_plan p = make_plan(window_size);
+    // Print properties of the most recent spectrogram.
+    spectrel_describe_spectrogram(spectrogram);
 
-    if (!p)
-    {
-        state = SPECTREL_STATE_FAILURE;
-        goto cleanup;
-    }
-
-    // Execute the short-time discrete fourier transform.
-    spectrel_spectrogram_t *s =
-        stfft(p, window, signal, window_hop, sample_rate);
-
-    if (!s)
-    {
-        state = SPECTREL_STATE_FAILURE;
-        goto cleanup;
-    }
-
-    // Print spectrogram properties.
-    describe_spectrogram(s);
+    status = SPECTREL_SUCCESS;
 
 cleanup:
-    if (signal)
+    spectrel_deactivate_stream(receiver);
+    if (spectrogram)
     {
-        free_signal(signal);
-        signal = NULL;
+        spectrel_free_spectrogram(spectrogram);
+        spectrogram = NULL;
     }
-
-    if (window)
-    {
-        free_signal(window);
-        window = NULL;
-    }
-
     if (buffer)
     {
-        free_signal(buffer);
+        spectrel_free_signal(buffer);
         buffer = NULL;
     }
-
-    if (p)
+    if (window)
     {
-        free_plan(p);
-        p = NULL;
+        spectrel_free_signal(window);
+        window = NULL;
     }
-
-    if (s)
+    if (plan)
     {
-        free_spectrogram(s);
-        s = NULL;
+        spectrel_free_plan(plan);
+        plan = NULL;
     }
-
-    return (state == SPECTREL_STATE_OK) ? exit_success() : exit_failure();
+    if (receiver)
+    {
+        spectrel_free_receiver(receiver);
+        receiver = NULL;
+    }
+    return (status == SPECTREL_SUCCESS) ? exit_success() : exit_failure();
 }

@@ -1,8 +1,10 @@
 #ifndef SPECTREL_STFFT_H
 #define SPECTREL_STFFT_H
 
+// Include <complex.h> before <fftw.3> so that fftw_complex is the native
+// double-precision complex.
+#include <complex.h>
 #include <fftw3.h>
-#include <stdlib.h>
 
 /**
  * @brief A discrete, complex-valued signal.
@@ -14,7 +16,7 @@ typedef struct
 } spectrel_signal_t;
 
 /**
- * A supported signal type.
+ * @brief A supported signal type.
  */
 typedef enum
 {
@@ -22,17 +24,6 @@ typedef enum
     SPECTREL_CONSTANT_SIGNAL,
     SPECTREL_COSINE_SIGNAL,
 } spectrel_signal_type_t;
-
-/**
- * @brief Indicate that no parameters are required.
- */
-typedef struct
-{
-
-} spectrel_no_params_t;
-
-// Indicate that no parameters are required.
-#define SPECTREL_NO_PARAMS NULL
 
 /**
  * @brief Parameters for cosine signals.
@@ -75,13 +66,16 @@ typedef struct
  * sample.
  * @param signal The signal to describe.
  */
-void describe_signal(const spectrel_signal_t *signal);
+void spectrel_describe_signal(const spectrel_signal_t *signal);
 
 /**
  * @brief Frees memory used by a signal.
+ *
+ *  This frees all the underlying memory and clears the members.
+ *
  * @param signal Pointer to the signal to free.
  */
-void free_signal(spectrel_signal_t *signal);
+void spectrel_free_signal(spectrel_signal_t *signal);
 
 /**
  * @brief Generate a discrete, complex-valued signal.
@@ -90,9 +84,10 @@ void free_signal(spectrel_signal_t *signal);
  * @param params Configurable parameters for the specified signal type.
  * @return The signal.
  */
-spectrel_signal_t *make_signal(const size_t num_samples,
-                               const spectrel_signal_type_t signal_type,
-                               void *params);
+spectrel_signal_t *
+spectrel_make_signal(const size_t num_samples,
+                     const spectrel_signal_type_t signal_type,
+                     void *params);
 
 /**
  * @brief An opaque structure encapsulating the information to carry out an
@@ -101,17 +96,37 @@ spectrel_signal_t *make_signal(const size_t num_samples,
 typedef struct spectrel_plan_t *spectrel_plan;
 
 /**
+ * @brief Free all resources allocated by a plan.
+ *
+ * This frees all the underlying memory and clears the members.
+ *
+ * @param The plan to destroy.
+ * @return Zero for success, or an error code on failure.
+ */
+void spectrel_free_plan(spectrel_plan p);
+
+/**
  * @brief Plan an in-place 1D DFT on a buffer.
  * @param buffer_size The number of samples in the buffer.
  * @return The plan.
  */
-spectrel_plan make_plan(const size_t buffer_size);
+spectrel_plan spectrel_make_plan(const size_t buffer_size);
 
 /**
- * @brief Free all resources allocated by a plan.
- * @param The plan to destroy.
+ * @brief Print properties of the spectrogram, and the values of each
+ * sample.
+ * @param signal The signal to describe.
  */
-void free_plan(spectrel_plan p);
+void spectrel_describe_spectrogram(const spectrel_spectrogram_t *spectrogram);
+
+/**
+ * @brief Frees memory used by a spectrogram.
+ *
+ * This frees all the underlying memory and clears the members.
+ *
+ * @param signal Pointer to the spectrogram to free.
+ */
+void spectrel_free_spectrogram(spectrel_spectrogram_t *spectrogram);
 
 /**
  * @brief Compute the short-time discrete Fourier transform of the input signal
@@ -128,23 +143,10 @@ void free_plan(spectrel_plan p);
  * @param sample_rate The sample rate of the signal.
  * @return A spectrogram containing the amplitude of each spectral component.
  */
-spectrel_spectrogram_t *stfft(spectrel_plan p,
-                              const spectrel_signal_t *window,
-                              const spectrel_signal_t *signal,
-                              const size_t window_hop,
-                              const double sample_rate);
-
-/**
- * @brief Print properties of the spectrogram, and the values of each
- * sample.
- * @param signal The signal to describe.
- */
-void describe_spectrogram(const spectrel_spectrogram_t *spectrogram);
-
-/**
- * @brief Frees memory used by a spectrogram
- * @param signal Pointer to the spectrogram to free.
- */
-void free_spectrogram(spectrel_spectrogram_t *spectrogram);
+spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
+                                       const spectrel_signal_t *window,
+                                       const spectrel_signal_t *signal,
+                                       const size_t window_hop,
+                                       const double sample_rate);
 
 #endif
