@@ -1,5 +1,4 @@
 
-#include "error.h"
 #include "spectrel.h"
 
 #include <stdlib.h>
