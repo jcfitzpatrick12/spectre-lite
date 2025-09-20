@@ -1,10 +1,12 @@
+
+#include "error.h"
 #include "spectrel.h"
 
 #include <stdlib.h>
 
 int exit_failure()
 {
-    fprintf(stderr, "An unexpected error occured.\n");
+    print_error("An unexpected error occurred");
     return SPECTREL_FAILURE;
 }
 
@@ -23,6 +25,8 @@ int main(int argc, char *argv[])
     spectrel_plan plan = NULL;
     spectrel_signal_t *window = NULL;
     spectrel_spectrogram_t *spectrogram = NULL;
+    char *dir = NULL;
+    char *file_path = NULL;
     int status = SPECTREL_FAILURE;
 
     // TODO: Specify configurable parameters via command line arguments.
@@ -80,11 +84,11 @@ int main(int argc, char *argv[])
     }
 
     // Write the latest spectrogram to file in the PGM format.
-    char *dir = spectrel_get_dir();
+    dir = spectrel_get_dir();
     if (spectrel_make_dir(dir) != 0)
         goto cleanup;
 
-    char *file_path = spectrel_join(dir, "img.pgm");
+    file_path = spectrel_join(dir, "img.pgm");
     if (!file_path)
         goto cleanup;
 

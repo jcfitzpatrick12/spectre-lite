@@ -1,5 +1,7 @@
+
 #include "paths.h"
 #include "constants.h"
+#include "error.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -25,7 +27,8 @@ int spectrel_make_dir(const char *dir)
         }
         else
         {
-            fprintf(stderr, "mkdir fail: Failed to create %s\n", dir);
+            print_error(
+                "Failed to create directory '%s': %s", dir, strerror(errno));
             return SPECTREL_FAILURE;
         }
     }
@@ -46,7 +49,7 @@ char *spectrel_join(const char *dir, const char *file_name)
     char *result = malloc(total_len);
     if (!result)
     {
-        fprintf(stderr, "malloc fail: result");
+        print_error("Memory allocation failed for directory join result");
         return NULL;
     }
 

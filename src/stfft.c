@@ -1,5 +1,7 @@
+
 #include "stfft.h"
 #include "constants.h"
+#include "error.h"
 
 #include <complex.h>
 #include <fftw3.h>
@@ -103,7 +105,7 @@ spectrel_generate_signal(const size_t num_samples,
 
     if (!samples)
     {
-        fprintf(stderr, "malloc fail: samples");
+        print_error("Memory allocation failed for signal samples");
         return NULL;
     }
 
@@ -112,7 +114,7 @@ spectrel_generate_signal(const size_t num_samples,
     {
         fftw_free(samples);
         samples = NULL;
-        fprintf(stderr, "malloc fail: signal");
+        print_error("Memory allocation failed for signal struct");
         return NULL;
     }
 
@@ -141,7 +143,7 @@ spectrel_make_signal(const size_t num_samples,
         signal_generator = &spectrel_constant_signal_generator;
         break;
     default:
-        fprintf(stderr, "Unrecognised signal type: %d\n", signal_type);
+        print_error("Unrecognised signal type: %d", signal_type);
         return NULL;
     }
 
@@ -183,7 +185,7 @@ spectrel_plan spectrel_make_plan(const size_t buffer_size)
     spectrel_signal_t *buffer = spectrel_make_buffer(buffer_size);
     if (!buffer)
     {
-        fprintf(stderr, "make_buffer fail");
+        print_error("Failed to create buffer signal");
         return NULL;
     }
 
@@ -197,7 +199,7 @@ spectrel_plan spectrel_make_plan(const size_t buffer_size)
     {
         spectrel_free_signal(buffer);
         buffer = NULL;
-        fprintf(stderr, "plan_dft_1d fail");
+        print_error("Failed to create DFT plan");
         return NULL;
     }
 
@@ -211,7 +213,7 @@ spectrel_plan spectrel_make_plan(const size_t buffer_size)
         spectrel_free_signal(buffer);
         buffer = NULL;
 
-        fprintf(stderr, "malloc fail: spectrel_plan");
+        print_error("Memory allocation failed for plan struct");
         return NULL;
     }
 
@@ -227,7 +229,7 @@ spectrel_make_empty_spectrogram(const size_t num_spectrums,
     spectrel_spectrogram_t *spectrogram = malloc(sizeof(*spectrogram));
     if (!spectrogram)
     {
-        fprintf(stderr, "malloc fail: spectrogram");
+        print_error("Memory allocation failed for spectrogram struct");
         return NULL;
     }
 
@@ -236,7 +238,7 @@ spectrel_make_empty_spectrogram(const size_t num_spectrums,
     {
         free(spectrogram);
         spectrogram = NULL;
-        fprintf(stderr, "malloc fail: times");
+        print_error("Memory allocation failed for times array");
         return NULL;
     }
 
@@ -250,7 +252,7 @@ spectrel_make_empty_spectrogram(const size_t num_spectrums,
 
         free(times);
         times = NULL;
-        fprintf(stderr, "malloc fail: frequencies");
+        print_error("Memory allocation failed for frequencies array");
         return NULL;
     }
 
@@ -267,7 +269,7 @@ spectrel_make_empty_spectrogram(const size_t num_spectrums,
         free(frequencies);
         frequencies = NULL;
 
-        fprintf(stderr, "malloc fail: samples");
+        print_error("Memory allocation failed for spectrogram samples");
         return NULL;
     }
 
@@ -386,19 +388,19 @@ spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
 
     if (buffer_size != window_size)
     {
-        fprintf(stderr, "The buffer size must be the same size as the window");
+        print_error("Buffer size must match window size");
         return NULL;
     }
 
     if (window_size > signal_size)
     {
-        fprintf(stderr, "The window must fit within the signal");
+        print_error("Window size must not exceed signal size");
         return NULL;
     }
 
     if (window_size < 1 || window_hop < 1)
     {
-        fprintf(stderr, "The window size and hop must be at least one");
+        print_error("Window size and hop must be at least one");
         return NULL;
     }
 
@@ -417,7 +419,7 @@ spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
     // Handle if the memory allocation fails
     if (!s)
     {
-        fprintf(stderr, "make_empty_spectrogram fail");
+        print_error("Failed to create empty spectrogram");
         return NULL;
     }
 
@@ -482,7 +484,7 @@ static int spectrel_spectrogram_writer_pgm(spectrel_spectrogram_t *s, FILE *f)
     // be stored with one byte.
     if (SPECTREL_PGM_MAXVAL > 255)
     {
-        fprintf(stderr, "The maximum gray value must less than 256");
+        print_error("Maximum gray value must be less than 256");
         return SPECTREL_FAILURE;
     }
 
@@ -503,7 +505,7 @@ static int spectrel_spectrogram_writer_pgm(spectrel_spectrogram_t *s, FILE *f)
     unsigned char *buffer = malloc(sizeof(*buffer) * total_num_pixels);
     if (!buffer)
     {
-        fprintf(stderr, "malloc fail: buffer");
+        print_error("Memory allocation failed for PGM buffer");
         return SPECTREL_FAILURE;
     }
 
@@ -533,7 +535,7 @@ int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
     FILE *f = fopen(file_path, "wb");
     if (!f)
     {
-        fprintf(stderr, "fopen fail: %s\n", file_path);
+        print_error("Failed to open file '%s' for writing", file_path);
         return SPECTREL_FAILURE;
     }
 
@@ -545,7 +547,7 @@ int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
         writer = &spectrel_spectrogram_writer_pgm;
         break;
     default:
-        fprintf(stderr, "Unrecognised file format requested: %d\n", format);
+        print_error("Unrecognised file format requested: %d", format);
         return SPECTREL_FAILURE;
     }
     // Write the spectrogram to file in the appropriate format.
