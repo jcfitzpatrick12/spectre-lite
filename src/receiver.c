@@ -54,9 +54,7 @@ spectrel_receiver spectrel_make_receiver(const char *name,
 
     if (!receiver)
     {
-        fprintf(
-            stderr,
-            "Malloc fail: Failed to allocate memory for the receiver pointer.");
+        fprintf(stderr, "malloc fail: receiver");
         return NULL;
     }
 
@@ -72,9 +70,9 @@ spectrel_receiver spectrel_make_receiver(const char *name,
 
     if (!receiver->device)
     {
-        fprintf(stderr, "make fail: %s\n", SoapySDRDevice_lastError());
         spectrel_free_receiver(receiver);
         receiver = NULL;
+        fprintf(stderr, "make fail: %s\n", SoapySDRDevice_lastError());
         return NULL;
     }
 
@@ -82,35 +80,35 @@ spectrel_receiver spectrel_make_receiver(const char *name,
     if (SoapySDRDevice_setFrequency(
             receiver->device, SOAPY_SDR_RX, 0, frequency, NULL) != 0)
     {
-        fprintf(stderr, "setFrequency fail: %s\n", SoapySDRDevice_lastError());
         spectrel_free_receiver(receiver);
         receiver = NULL;
+        fprintf(stderr, "setFrequency fail: %s\n", SoapySDRDevice_lastError());
         return NULL;
     }
 
     if (SoapySDRDevice_setSampleRate(
             receiver->device, SOAPY_SDR_RX, 0, sample_rate) != 0)
     {
-        fprintf(stderr, "setSampleRate fail: %s\n", SoapySDRDevice_lastError());
         spectrel_free_receiver(receiver);
         receiver = NULL;
+        fprintf(stderr, "setSampleRate fail: %s\n", SoapySDRDevice_lastError());
         return NULL;
     }
 
     if (SoapySDRDevice_setBandwidth(
             receiver->device, SOAPY_SDR_RX, 0, bandwidth) != 0)
     {
-        fprintf(stderr, "setBandwidth fail: %s\n", SoapySDRDevice_lastError());
         spectrel_free_receiver(receiver);
         receiver = NULL;
+        fprintf(stderr, "setBandwidth fail: %s\n", SoapySDRDevice_lastError());
         return NULL;
     }
 
     if (SoapySDRDevice_setGain(receiver->device, SOAPY_SDR_RX, 0, gain) != 0)
     {
-        fprintf(stderr, "setGain fail: %s\n", SoapySDRDevice_lastError());
         spectrel_free_receiver(receiver);
         receiver = NULL;
+        fprintf(stderr, "setGain fail: %s\n", SoapySDRDevice_lastError());
         return NULL;
     }
 
@@ -119,9 +117,9 @@ spectrel_receiver spectrel_make_receiver(const char *name,
         receiver->device, SOAPY_SDR_RX, SOAPY_SDR_CF64, NULL, 0, NULL);
     if (!receiver->rx_stream)
     {
-        fprintf(stderr, "setupStream fail: %s\n", SoapySDRDevice_lastError());
         spectrel_free_receiver(receiver);
         receiver = NULL;
+        fprintf(stderr, "setupStream fail: %s\n", SoapySDRDevice_lastError());
         return NULL;
     }
 

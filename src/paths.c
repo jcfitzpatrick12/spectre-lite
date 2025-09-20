@@ -45,7 +45,10 @@ char *spectrel_join(const char *dir, const char *file_name)
 
     char *result = malloc(total_len);
     if (!result)
+    {
+        fprintf(stderr, "malloc fail: result");
         return NULL;
+    }
 
     strcpy(result, dir);
     result[dir_len] = '/';
