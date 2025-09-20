@@ -19,8 +19,8 @@ int main(int argc, char *argv[])
 
     // Initialise the program.
     spectrel_receiver receiver = NULL;
-    spectrel_plan plan = NULL;
     spectrel_signal_t *buffer = NULL;
+    spectrel_plan plan = NULL;
     spectrel_signal_t *window = NULL;
     spectrel_spectrogram_t *spectrogram = NULL;
     int status = SPECTREL_FAILURE;
@@ -32,9 +32,10 @@ int main(int argc, char *argv[])
     const double sample_rate = 2e6;
     const double bandwidth = 2e6;
     const double gain = 20;
-    const size_t buffer_size = 256;
-    const size_t window_size = 64;
-    const size_t window_hop = 64;
+    const size_t buffer_size = 1000;
+    const size_t window_size = 32;
+    const size_t window_hop = 32;
+    spectrel_format_t format = SPECTREL_FORMAT_PGM;
 
     // Initialise the receiver.
     receiver =
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
     // Stream samples into the buffer, then apply the short-time DFT.
     // TODO: Make the duration of capture configurable, keeping track
     // of elapsed time via sample counting. For now, it's hard-coded.
-    for (size_t n = 0; n < 10; n++)
+    for (size_t n = 0; n < 3; n++)
     {
         if (spectrel_read_stream(receiver, buffer) != 0)
             goto cleanup;
@@ -78,8 +79,8 @@ int main(int argc, char *argv[])
             goto cleanup;
     }
 
-    // Print properties of the most recent spectrogram.
-    spectrel_describe_spectrogram(spectrogram);
+    // Write the spectrogram to file in the PGM format.
+    spectrel_write_spectrogram(spectrogram, "./img.pgm", format);
 
     status = SPECTREL_SUCCESS;
 

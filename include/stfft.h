@@ -26,6 +26,14 @@ typedef enum
 } spectrel_signal_type_t;
 
 /**
+ * @brief A supported file format for spectrograms.
+ */
+typedef enum
+{
+    SPECTREL_FORMAT_PGM
+} spectrel_format_t;
+
+/**
  * @brief Parameters for cosine signals.
  */
 typedef struct
@@ -148,5 +156,16 @@ spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
                                        const spectrel_signal_t *signal,
                                        const size_t window_hop,
                                        const double sample_rate);
+
+/**
+ * @brief Write a spectrogram to file in the requested file format. Only the
+ * spectrums are saved, any metadata is discarded.
+ * @param s The spectrogram structure.
+ * @param file_path The absolute/relative file path.
+ * @return Zero for success, or an error code on failure.
+ */
+int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
+                               const char *file_path,
+                               spectrel_format_t);
 
 #endif

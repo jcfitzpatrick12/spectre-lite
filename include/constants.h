@@ -21,4 +21,10 @@
  */
 #define SPECTREL_TIMEOUT 1e6
 
+/**
+ * The maximum gray value in the PGM format, so that each pixel
+ * can be stored as one byte.
+ */
+#define SPECTREL_PGM_MAXVAL 255
+
 #endif // SPECTREL_CONSTANTS_H
