@@ -554,8 +554,7 @@ int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
     if (writer(s, f) != SPECTREL_SUCCESS)
     {
         fclose(f);
-        fprintf(
-            stderr, "Failed to write spectrogram to the file %s\n", file_path);
+        print_error("Failed to write spectrogram to the file %s\n", file_path);
         return SPECTREL_FAILURE;
     }
 
