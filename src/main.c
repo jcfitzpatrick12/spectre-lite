@@ -32,9 +32,9 @@ int main(int argc, char *argv[])
     const double sample_rate = 2e6;
     const double bandwidth = 2e6;
     const double gain = 20;
-    const size_t buffer_size = 1000;
-    const size_t window_size = 32;
-    const size_t window_hop = 32;
+    const size_t buffer_size = 1e5;
+    const size_t window_size = 1024;
+    const size_t window_hop = 512;
     spectrel_format_t format = SPECTREL_FORMAT_PGM;
 
     // Initialise the receiver.
@@ -65,8 +65,6 @@ int main(int argc, char *argv[])
         window_size, SPECTREL_CONSTANT_SIGNAL, (void *)&window_params);
     if (!window)
         goto cleanup;
-
-    // Make the directory to hold the data.
 
     // Stream samples into the buffer, then apply the short-time DFT.
     // TODO: Make the duration of capture configurable, keeping track
