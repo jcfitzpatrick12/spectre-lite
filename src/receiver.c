@@ -151,14 +151,28 @@ int spectrel_deactivate_stream(spectrel_receiver receiver)
 
 int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
 {
-    void *buffers[] = {buffer->samples};
-    int ret = SoapySDRDevice_readStream(receiver->device,
-                                        receiver->rx_stream,
-                                        buffers,
-                                        buffer->num_samples,
-                                        0,
-                                        0,
-                                        SPECTREL_TIMEOUT);
+    int num_samples_read = 0;
+    void *buffers[] = {NULL};
 
-    return (ret > 0) ? SPECTREL_SUCCESS : SPECTREL_FAILURE;
+    // Keep calling readStream until the buffer is full.
+    while (num_samples_read < buffer->num_samples)
+    {
+        buffers[0] = (void *)(buffer->samples + num_samples_read);
+        int ret =
+            SoapySDRDevice_readStream(receiver->device,
+                                      receiver->rx_stream,
+                                      buffers,
+                                      buffer->num_samples - num_samples_read,
+                                      0,
+                                      0,
+                                      SPECTREL_TIMEOUT);
+        if (ret < 1)
+        {
+            print_error("readStream fail: %s\n", SoapySDRDevice_lastError());
+            return SPECTREL_FAILURE;
+        }
+        num_samples_read += ret;
+    }
+
+    return SPECTREL_SUCCESS;
 }
