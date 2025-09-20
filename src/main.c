@@ -1,6 +1,6 @@
 #include "spectrel.h"
 
-#include <stdio.h>
+#include <stdlib.h>
 
 int exit_failure()
 {
@@ -66,6 +66,8 @@ int main(int argc, char *argv[])
     if (!window)
         goto cleanup;
 
+    // Make the directory to hold the data.
+
     // Stream samples into the buffer, then apply the short-time DFT.
     // TODO: Make the duration of capture configurable, keeping track
     // of elapsed time via sample counting. For now, it's hard-coded.
@@ -79,12 +81,30 @@ int main(int argc, char *argv[])
             goto cleanup;
     }
 
-    // Write the spectrogram to file in the PGM format.
-    spectrel_write_spectrogram(spectrogram, "./img.pgm", format);
+    // Write the latest spectrogram to file in the PGM format.
+    char *dir = spectrel_get_dir();
+    if (spectrel_make_dir(dir) != 0)
+        goto cleanup;
+
+    char *file_path = spectrel_join(dir, "img.pgm");
+    if (!file_path)
+        goto cleanup;
+
+    spectrel_write_spectrogram(spectrogram, file_path, format);
 
     status = SPECTREL_SUCCESS;
 
 cleanup:
+    if (dir)
+    {
+        free(dir);
+        dir = NULL;
+    }
+    if (file_path)
+    {
+        free(file_path);
+        file_path = NULL;
+    }
     spectrel_deactivate_stream(receiver);
     if (spectrogram)
     {

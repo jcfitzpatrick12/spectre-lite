@@ -2,6 +2,7 @@
 #define SPECTREL_H
 
 #include "constants.h"
+#include "paths.h"
 #include "receiver.h"
 #include "stfft.h"
 

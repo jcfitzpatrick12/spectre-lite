@@ -516,10 +516,10 @@ static int spectrel_spectrogram_writer_pgm(spectrel_spectrogram_t *s, FILE *f)
 }
 
 int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
-                               const char *filename,
+                               const char *file_path,
                                spectrel_format_t format)
 {
-    FILE *f = fopen(filename, "wb");
+    FILE *f = fopen(file_path, "wb");
     if (!f)
     {
         return SPECTREL_FAILURE;
