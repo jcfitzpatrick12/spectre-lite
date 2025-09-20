@@ -452,3 +452,96 @@ spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
     }
     return s;
 }
+
+typedef int (*spectrel_spectrogram_writer_t)(spectrel_spectrogram_t *s,
+                                             FILE *f);
+
+static int spectrel_spectrogram_writer_pgm(spectrel_spectrogram_t *s, FILE *f)
+{
+    // Write the header. The PGM formats magic number is the two characters
+    // "P5". The width, height and the maximum gray value are formatted as ASCII
+    // characters in decimal.
+    // TODO: Resolve potential overflow here.
+    const size_t height = s->num_samples_per_spectrum;
+    const size_t width = s->num_spectrums;
+    const size_t total_num_pixels = height * width;
+    fprintf(f, "P5\n%zu %zu\n%d\n", width, height, SPECTREL_PGM_MAXVAL);
+
+    // We assume the max gray value is less than 256, so that each pixel will
+    // be stored with one byte.
+    if (SPECTREL_PGM_MAXVAL > 255)
+    {
+        fprintf(stderr, "The maximum gray value must less than 256.");
+        return SPECTREL_FAILURE;
+    }
+
+    // Compute the minimum and max DFT amplitude.
+    double min = INFINITY, max = -INFINITY;
+    for (size_t n = 0; n < total_num_pixels; n++)
+    {
+        double mag = cabs(s->samples[n]);
+        if (mag < min)
+            min = mag;
+        if (mag > max)
+            max = mag;
+    }
+
+    // Normalise each pixel value between [0, SPECTREL_PGM_MAXVAL).
+    // Spectrograms are stored column-major, so are written to the buffer in
+    // row-major.
+    unsigned char *buffer = calloc(total_num_pixels, sizeof(*buffer));
+    if (!buffer)
+    {
+        fprintf(stderr, "Failed to allocate pixel buffer.");
+        return SPECTREL_FAILURE;
+    }
+
+    for (size_t n = 0; n < height; n++)
+    {
+        for (size_t m = 0; m < width; m++)
+        {
+            size_t index = n + m * height;
+            double mag = cabs(s->samples[index]);
+            buffer[n * width + m] = (unsigned char)floor(
+                ((mag - min) / (max - min)) * (double)SPECTREL_PGM_MAXVAL);
+        }
+    }
+
+    // Write the raster of `height` rows. Rows written first are assumed to be
+    // at the top.
+    fwrite(buffer, sizeof(*buffer), total_num_pixels, f);
+
+    free(buffer);
+    return SPECTREL_SUCCESS;
+}
+
+int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
+                               const char *filename,
+                               spectrel_format_t format)
+{
+    FILE *f = fopen(filename, "wb");
+    if (!f)
+    {
+        return SPECTREL_FAILURE;
+    }
+
+    // Choose the writer.
+    spectrel_spectrogram_writer_t writer;
+    switch (format)
+    {
+    case SPECTREL_FORMAT_PGM:
+        writer = &spectrel_spectrogram_writer_pgm;
+        break;
+    default:
+        return SPECTREL_FAILURE;
+    }
+    // Write the spectrogram to file in the appropriate format.
+    if (writer(s, f) != SPECTREL_SUCCESS)
+    {
+        fclose(f);
+        return SPECTREL_FAILURE;
+    }
+
+    fclose(f);
+    return SPECTREL_SUCCESS;
+}
