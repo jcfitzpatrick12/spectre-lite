@@ -24,7 +24,7 @@ int spectrel_free_receiver(spectrel_receiver receiver)
         if (SoapySDRDevice_closeStream(receiver->device, receiver->rx_stream) !=
             0)
         {
-            print_error("closeStream failed: %s", SoapySDRDevice_lastError());
+            spectrel_print_error("closeStream failed: %s", SoapySDRDevice_lastError());
             return SPECTREL_FAILURE;
         }
         receiver->rx_stream = NULL;
@@ -34,7 +34,7 @@ int spectrel_free_receiver(spectrel_receiver receiver)
     {
         if (SoapySDRDevice_unmake(receiver->device) != 0)
         {
-            print_error("unmake failed: %s", SoapySDRDevice_lastError());
+            spectrel_print_error("unmake failed: %s", SoapySDRDevice_lastError());
             return SPECTREL_FAILURE;
         }
         receiver->device = NULL;
@@ -55,7 +55,7 @@ spectrel_receiver spectrel_make_receiver(const char *name,
 
     if (!receiver)
     {
-        print_error("Memory allocation failed for receiver");
+        spectrel_print_error("Memory allocation failed for receiver");
         return NULL;
     }
 
@@ -73,7 +73,7 @@ spectrel_receiver spectrel_make_receiver(const char *name,
     {
         spectrel_free_receiver(receiver);
         receiver = NULL;
-        print_error("Device creation failed: %s", SoapySDRDevice_lastError());
+        spectrel_print_error("Device creation failed: %s", SoapySDRDevice_lastError());
         return NULL;
     }
 
@@ -83,7 +83,7 @@ spectrel_receiver spectrel_make_receiver(const char *name,
     {
         spectrel_free_receiver(receiver);
         receiver = NULL;
-        print_error("setFrequency failed: %s", SoapySDRDevice_lastError());
+        spectrel_print_error("setFrequency failed: %s", SoapySDRDevice_lastError());
         return NULL;
     }
 
@@ -92,7 +92,7 @@ spectrel_receiver spectrel_make_receiver(const char *name,
     {
         spectrel_free_receiver(receiver);
         receiver = NULL;
-        print_error("setSampleRate failed: %s", SoapySDRDevice_lastError());
+        spectrel_print_error("setSampleRate failed: %s", SoapySDRDevice_lastError());
         return NULL;
     }
 
@@ -101,7 +101,7 @@ spectrel_receiver spectrel_make_receiver(const char *name,
     {
         spectrel_free_receiver(receiver);
         receiver = NULL;
-        print_error("setBandwidth failed: %s", SoapySDRDevice_lastError());
+        spectrel_print_error("setBandwidth failed: %s", SoapySDRDevice_lastError());
         return NULL;
     }
 
@@ -109,7 +109,7 @@ spectrel_receiver spectrel_make_receiver(const char *name,
     {
         spectrel_free_receiver(receiver);
         receiver = NULL;
-        print_error("setGain failed: %s", SoapySDRDevice_lastError());
+        spectrel_print_error("setGain failed: %s", SoapySDRDevice_lastError());
         return NULL;
     }
 
@@ -120,7 +120,7 @@ spectrel_receiver spectrel_make_receiver(const char *name,
     {
         spectrel_free_receiver(receiver);
         receiver = NULL;
-        print_error("setupStream failed: %s", SoapySDRDevice_lastError());
+        spectrel_print_error("setupStream failed: %s", SoapySDRDevice_lastError());
         return NULL;
     }
 
@@ -132,7 +132,7 @@ int spectrel_activate_stream(spectrel_receiver receiver)
     if (SoapySDRDevice_activateStream(
             receiver->device, receiver->rx_stream, 0, 0, 0) != 0)
     {
-        print_error("activateStream failed: %s", SoapySDRDevice_lastError());
+        spectrel_print_error("activateStream failed: %s", SoapySDRDevice_lastError());
         return SPECTREL_FAILURE;
     }
     return SPECTREL_SUCCESS;
@@ -143,7 +143,7 @@ int spectrel_deactivate_stream(spectrel_receiver receiver)
     if (SoapySDRDevice_deactivateStream(
             receiver->device, receiver->rx_stream, 0, 0) != 0)
     {
-        print_error("deactivateStream failed: %s", SoapySDRDevice_lastError());
+        spectrel_print_error("deactivateStream failed: %s", SoapySDRDevice_lastError());
         return SPECTREL_FAILURE;
     }
     return SPECTREL_SUCCESS;
@@ -168,7 +168,7 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
                                       SPECTREL_TIMEOUT);
         if (ret < 1)
         {
-            print_error("readStream fail: %s\n", SoapySDRDevice_lastError());
+            spectrel_print_error("readStream fail: %s\n", SoapySDRDevice_lastError());
             return SPECTREL_FAILURE;
         }
         num_samples_read += ret;

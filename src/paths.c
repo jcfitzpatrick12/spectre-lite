@@ -27,7 +27,7 @@ int spectrel_make_dir(const char *dir)
         }
         else
         {
-            print_error(
+            spectrel_print_error(
                 "Failed to create directory '%s': %s", dir, strerror(errno));
             return SPECTREL_FAILURE;
         }
@@ -49,7 +49,7 @@ char *spectrel_join(const char *dir, const char *file_name)
     char *result = malloc(total_len);
     if (!result)
     {
-        print_error("Memory allocation failed for directory join result");
+        spectrel_print_error("Memory allocation failed for directory join result");
         return NULL;
     }
 

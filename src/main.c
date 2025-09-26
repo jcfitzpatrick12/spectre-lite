@@ -5,7 +5,7 @@
 
 int exit_failure()
 {
-    print_error("An unexpected error occurred");
+    spectrel_print_error("An unexpected error occurred");
     return SPECTREL_FAILURE;
 }
 
@@ -23,21 +23,21 @@ int main(int argc, char *argv[])
     spectrel_signal_t *buffer = NULL;
     spectrel_plan plan = NULL;
     spectrel_signal_t *window = NULL;
-    spectrel_spectrogram_t *spectrogram = NULL;
     char *dir = NULL;
+    spectrel_spectrogram_t *spectrogram = NULL;
     char *file_path = NULL;
     int status = SPECTREL_FAILURE;
 
     // TODO: Specify configurable parameters via command line arguments.
     // For now, hard-code them.
     const char *name = "hackrf";
-    const double frequency = 95.8e6;
-    const double sample_rate = 20e6;
-    const double bandwidth = 20e6;
+    const double frequency = 100e6;
+    const double sample_rate = 2e6;
+    const double bandwidth = 2e6;
     const double gain = 20;
     const size_t buffer_size = 1e6;
-    const size_t window_size = 1024;
-    const size_t window_hop = 512;
+    const size_t window_size = 4096;
+    const size_t window_hop = 2048;
     spectrel_format_t format = SPECTREL_FORMAT_PGM;
 
     // Initialise the receiver.
@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
     if (spectrel_activate_stream(receiver) != 0)
         goto cleanup;
 
-    for (size_t n = 0; n < 20; n++)
+    for (size_t n = 0; n < 5; n++)
     {
         if (spectrogram)
         {
