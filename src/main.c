@@ -1,6 +1,8 @@
 
 #include "spectrel.h"
 
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 int exit_failure()
@@ -25,24 +27,26 @@ int main(int argc, char *argv[])
     spectrel_signal_t *window = NULL;
     char *dir = NULL;
     spectrel_spectrogram_t *spectrogram = NULL;
-    char *file_path = NULL;
+    spectrel_batch_file_t *batch_file = NULL;
     int status = SPECTREL_FAILURE;
 
     // TODO: Specify configurable parameters via command line arguments.
     // For now, hard-code them.
-    const char *name = "hackrf";
+    const char *driver = "hackrf";
     const double frequency = 100e6;
     const double sample_rate = 2e6;
     const double bandwidth = 2e6;
     const double gain = 20;
-    const size_t buffer_size = 1e6;
+    const size_t buffer_size = 2e4;
     const size_t window_size = 4096;
     const size_t window_hop = 2048;
+    const float batch_size = 2;
+    const float duration = 10;
     spectrel_format_t format = SPECTREL_FORMAT_PGM;
 
     // Initialise the receiver.
     receiver =
-        spectrel_make_receiver(name, frequency, sample_rate, bandwidth, gain);
+        spectrel_make_receiver(driver, frequency, sample_rate, bandwidth, gain);
 
     if (!receiver)
         goto cleanup;
@@ -65,7 +69,7 @@ int main(int argc, char *argv[])
         window_size, SPECTREL_CONSTANT_SIGNAL, (void *)&window_params);
     if (!window)
         goto cleanup;
-        
+
     // Set up the directory to write data produced at runtime.
     dir = spectrel_get_dir();
     if (spectrel_make_dir(dir) != 0)
@@ -77,34 +81,65 @@ int main(int argc, char *argv[])
     if (spectrel_activate_stream(receiver) != 0)
         goto cleanup;
 
-    for (size_t n = 0; n < 5; n++)
+    // Compute the time between each sample, assuming a constant sample rate.
+    double sample_interval = 1 / sample_rate;
+
+    // Keep a record of how many samples we've streamed per batch.
+    size_t num_samples_elapsed = 0;
+    size_t num_samples_per_batch = ceil(batch_size / sample_interval);
+
+    // Keep a record of how many samples we've streamed in total.
+    size_t total_num_samples_elapsed = 0;
+    size_t total_num_samples = ceil(duration / sample_interval);
+
+    // Record spectrograms in batched files until the user-specified duration
+    // has elapsed. Elapsed time is inferred by sample counting.
+    while (total_num_samples_elapsed < total_num_samples)
     {
+        if (!batch_file)
+        {
+            batch_file = spectrel_open_batch_file(dir, driver, format);
+        }
         if (spectrogram)
         {
             spectrel_free_spectrogram(spectrogram);
             spectrogram = NULL;
         }
         if (spectrel_read_stream(receiver, buffer) != 0)
+        {
             goto cleanup;
+        }
         spectrogram =
             spectrel_stfft(plan, window, buffer, window_hop, sample_rate);
         if (!spectrogram)
+        {
             goto cleanup;
-    }
+        }
 
-    // Write the latest spectrogram to file in the PGM file format.
-    file_path = spectrel_join(dir, "img.pgm");
-    if (!file_path)
-        goto cleanup;
-    spectrel_write_spectrogram(spectrogram, file_path, format);
+        // Write the spectrogram to the batch file
+        if (spectrel_write_spectrogram(spectrogram, batch_file, format) != 0)
+        {
+            goto cleanup;
+        }
+
+        total_num_samples_elapsed += buffer_size;
+        num_samples_elapsed += buffer_size;
+
+        if (num_samples_elapsed > num_samples_per_batch)
+        {
+            spectrel_close_batch_file(batch_file);
+            batch_file = NULL;
+            num_samples_elapsed = 0;
+        }
+    }
 
     status = SPECTREL_SUCCESS;
 
 cleanup:
-    if (file_path)
+    if (batch_file)
     {
-        free(file_path);
-        file_path = NULL;
+        spectrel_close_batch_file(batch_file);
+        batch_file = NULL;
     }
     if (dir)
     {

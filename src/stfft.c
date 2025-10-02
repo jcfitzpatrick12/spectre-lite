@@ -2,6 +2,7 @@
 #include "stfft.h"
 #include "constants.h"
 #include "errors.h"
+#include "files.h"
 
 #include <complex.h>
 #include <fftw3.h>
@@ -530,82 +531,8 @@ static int spectrel_spectrogram_writer_pgm(spectrel_spectrogram_t *s, FILE *f)
     return SPECTREL_SUCCESS;
 }
 
-struct spectrel_batch_file_t
-{
-    FILE *file;
-    char *name;
-};
-
-spectrel_batch_file spectrel_open_batch_file(const char *driver_name)
-{
-    // Get the current system time in UTC and format it in the ISO 8601 format.
-    time_t t = time(NULL);
-    struct tm *ut_time = gmtime(&t);
-    char datetime[NUM_CHARS_ISO_8601 +
-                  1]; // +1 to account for the null character.
-    int num_chars_written = strftime(
-        datetime, NUM_CHARS_ISO_8601 + 1, "%Y-%m-%dT%H:%M:%SZ", ut_time);
-    if (num_chars_written != NUM_CHARS_ISO_8601)
-    {
-        printf("%d\n", num_chars_written);
-        spectrel_print_error("Failed to format the current system time");
-        return NULL;
-    }
-
-    // Format the file name, embedding the current system time.
-    const size_t num_chars = NUM_CHARS_ISO_8601 + strlen("_") +
-                             strlen(driver_name) + strlen(".cf64") + 1;
-    char *name = malloc(num_chars * sizeof(char));
-    if (!name)
-    {
-        spectrel_print_error("Memory allocation failed for the file name");
-        return NULL;
-    }
-
-    int ret = snprintf(
-        name, sizeof(char) * num_chars, "%s_%s.cf64", datetime, driver_name);
-    if (ret < 0)
-    {
-        spectrel_print_error("Failed to format the file name");
-        free(name);
-        return NULL;
-    }
-
-    // Open the file.
-    FILE *file = fopen(name, "wb");
-
-    spectrel_batch_file batch_file = malloc(sizeof(*batch_file));
-    if (!batch_file)
-    {
-        spectrel_print_error("Memory allocation failed for the batch file.");
-        return NULL;
-    }
-
-    batch_file->file = file;
-    batch_file->name = name;
-    return batch_file;
-}
-
-void spectrel_close_batch_file(spectrel_batch_file batch_file)
-{
-    if (batch_file)
-    {
-        if (batch_file->file)
-        {
-            fclose(batch_file->file);
-            batch_file->file = NULL;
-        }
-        if (batch_file->name)
-        {
-            free(batch_file->name);
-            batch_file->name = NULL;
-        }
-        free(batch_file);
-    }
-}
-
 int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
-                               spectrel_batch_file batch_file,
+                               spectrel_batch_file_t *batch_file,
                                spectrel_format_t format)
 {
     // Choose the writer.
@@ -628,6 +555,5 @@ int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
         return SPECTREL_FAILURE;
     }
 
-    spectrel_close_batch_file(batch_file);
     return SPECTREL_SUCCESS;
 }

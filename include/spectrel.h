@@ -3,7 +3,7 @@
 
 #include "constants.h"
 #include "errors.h"
-#include "paths.h"
+#include "files.h"
 #include "receiver.h"
 #include "stfft.h"
 
