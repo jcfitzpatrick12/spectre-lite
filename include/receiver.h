@@ -11,14 +11,14 @@ typedef struct spectrel_receiver_t *spectrel_receiver;
 /**
  * @brief Create a new receiver structure.
  *
- * @param name The name of the receiver.
+ * @param driver A SDR driver supported by Soapy.
  * @param frequency The center frequency, in Hz.
  * @param sample_rate The sample rate, in Hz.
  * @param bandwidth bandwidth, in Hz.
  * @param gain The gain, in dB.
  * @return An opaque pointer to the newly initialised receiver structure.
  */
-spectrel_receiver spectrel_make_receiver(const char *name,
+spectrel_receiver spectrel_make_receiver(const char *driver,
                                          const double frequency,
                                          const double sample_rate,
                                          const double bandwidth,

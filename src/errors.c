@@ -1,5 +1,5 @@
 
-#include "error.h"
+#include "errors.h"
 #include <stdarg.h>
 #include <stdio.h>
 

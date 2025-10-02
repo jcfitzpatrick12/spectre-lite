@@ -5,6 +5,7 @@
  * @brief Get the directory where runtime data will be written to.
  * @return The value of the SPECTREL_DATA_DIR_PATH environment variable if it's
  * set, otherwise use the present working directory.
+ * @note The returned string must be freed by the caller.
  */
 char *spectrel_get_dir();
 

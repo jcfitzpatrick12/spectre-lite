@@ -1,6 +1,8 @@
 #ifndef SPECTREL_STFFT_H
 #define SPECTREL_STFFT_H
 
+#include <time.h>
+
 // Include <complex.h> before <fftw.3> so that fftw_complex is the native
 // double-precision complex.
 #include <complex.h>
@@ -158,14 +160,42 @@ spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
                                        const double sample_rate);
 
 /**
+ * @brief A batch file.
+ */
+typedef struct spectrel_batch_file_t *spectrel_batch_file;
+
+/**
+ * @brief Open a new batch file stream, with the current system time (UTC)
+ * embedded in the file name. The file name will be of the form
+ *
+ * <timestamp>_<driver>.cf64
+ *
+ * where the timestamp is ISO 8601 standard compliant.
+ *
+ * @param driver A SDR driver supported by Soapy.
+ * @return An opaque batch file.
+ *
+ */
+spectrel_batch_file spectrel_open_batch_file(const char *driver);
+
+/**
+ * @brief Close a batch file, and release any resources managed by it.
+ *
+ * @param file The batch file.
+ *
+ */
+void spectrel_close_batch_file(spectrel_batch_file batch_file);
+
+/**
  * @brief Write a spectrogram to file in the requested file format. Only the
  * spectrums are saved, any metadata is discarded.
+ *
  * @param s The spectrogram structure.
- * @param file_path The absolute/relative file path.
+ * @param f The file to write to.
  * @return Zero for success, or an error code on failure.
  */
 int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
-                               const char *file_path,
+                               spectrel_batch_file f,
                                spectrel_format_t);
 
 #endif

@@ -27,4 +27,9 @@
  */
 #define SPECTREL_PGM_MAXVAL 255
 
+/**
+ * The number of characters in a datetime compliant with the ISO 8601 standard
+ */
+#define NUM_CHARS_ISO_8601 20
+
 #endif // SPECTREL_CONSTANTS_H

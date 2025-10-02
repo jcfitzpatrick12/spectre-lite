@@ -1,13 +1,14 @@
 
 #include "paths.h"
 #include "constants.h"
-#include "error.h"
+#include "errors.h"
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 
 char *spectrel_get_dir()
 {
@@ -49,7 +50,8 @@ char *spectrel_join(const char *dir, const char *file_name)
     char *result = malloc(total_len);
     if (!result)
     {
-        spectrel_print_error("Memory allocation failed for directory join result");
+        spectrel_print_error(
+            "Memory allocation failed for directory join result");
         return NULL;
     }
 
