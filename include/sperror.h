@@ -1,5 +1,5 @@
-#ifndef ERROR_H
-#define ERROR_H
+#ifndef SPERRORS_H
+#define SPERRORS_H
 
 #include <stdarg.h>
 
@@ -13,6 +13,6 @@
  * @param fmt The format string (printf-style).
  * @param ... Additional arguments to format.
  */
-void print_error(const char *fmt, ...);
+void spectrel_print_error(const char *fmt, ...);
 
-#endif // ERROR_H
+#endif // SPERRORS_H

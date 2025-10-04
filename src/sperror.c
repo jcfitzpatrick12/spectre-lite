@@ -1,9 +1,9 @@
 
-#include "error.h"
+#include "sperror.h"
 #include <stdarg.h>
 #include <stdio.h>
 
-void print_error(const char *fmt, ...)
+void spectrel_print_error(const char *fmt, ...)
 {
     va_list args;
     fprintf(stderr, "Error: ");
