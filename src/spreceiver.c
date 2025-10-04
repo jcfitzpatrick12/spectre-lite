@@ -1,8 +1,8 @@
 
-#include "receiver.h"
-#include "constants.h"
-#include "errors.h"
-#include "stfft.h"
+#include "spreceiver.h"
+#include "spconstants.h"
+#include "sperror.h"
+#include "spsignal.h"
 
 #include <SoapySDR/Constants.h>
 #include <SoapySDR/Device.h>

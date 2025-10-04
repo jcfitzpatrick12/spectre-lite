@@ -1,7 +1,7 @@
-#ifndef SPECTREL_STFFT_H
-#define SPECTREL_STFFT_H
+#ifndef SPSIGNAL_H
+#define SPSIGNAL_H
 
-#include "files.h"
+#include "sppath.h"
 
 #include <time.h>
 // Include <complex.h> before <fftw.3> so that fftw_complex is the native
@@ -153,15 +153,13 @@ spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
                                        const double sample_rate);
 
 /**
- * @brief Write a spectrogram to file in the requested file format. Only the
+ * @brief Write a spectrogram to file in column (spectrum) major order. Only the
  * spectrums are saved, any metadata is discarded.
  *
  * @param s The spectrogram structure.
  * @param f The file to write to.
  * @return Zero for success, or an error code on failure.
  */
-int spectrel_write_spectrogram(spectrel_spectrogram_t *s,
-                               spectrel_batch_file_t *f,
-                               spectrel_format_t);
+int spectrel_write_spectrogram(spectrel_spectrogram_t *s, spectrel_file_t *f);
 
-#endif
+#endif // SPSIGNAL_H

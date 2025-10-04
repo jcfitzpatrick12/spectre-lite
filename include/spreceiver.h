@@ -1,7 +1,7 @@
-#ifndef SPECTREL_RECEIVER_H
-#define SPECTREL_RECEIVER_H
+#ifndef SPRECEIVER_H
+#define SPRECEIVER_H
 
-#include "stfft.h"
+#include "spsignal.h"
 
 /**
  * @brief An opaque pointer to a receiver structure.
@@ -42,7 +42,7 @@ int spectrel_free_receiver(spectrel_receiver receiver);
 int spectrel_activate_stream(spectrel_receiver receiver);
 
 /**
- * @brief Activate a stream, to prepare for reading.
+ * @brief Deactivate the stream for a receiver structure.
  * @param A pointer to the receiver structure.
  * @return Zero for success, or an error code on failure.
  */
@@ -57,4 +57,4 @@ int spectrel_deactivate_stream(spectrel_receiver receiver);
  */
 int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer);
 
-#endif // SPECTREL_DEVICE_H
+#endif // SPRECEIVER_H

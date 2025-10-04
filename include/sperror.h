@@ -1,5 +1,5 @@
-#ifndef ERRORS_H
-#define ERRORS_H
+#ifndef SPERRORS_H
+#define SPERRORS_H
 
 #include <stdarg.h>
 
@@ -15,4 +15,4 @@
  */
 void spectrel_print_error(const char *fmt, ...);
 
-#endif // ERRORS_H
+#endif // SPERRORS_H

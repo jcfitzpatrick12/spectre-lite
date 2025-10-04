@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 int exit_failure()
 {
@@ -19,41 +20,35 @@ int exit_success()
 
 int main(int argc, char *argv[])
 {
-
     // Initialise the program.
     spectrel_receiver receiver = NULL;
     spectrel_signal_t *buffer = NULL;
     spectrel_plan plan = NULL;
     spectrel_signal_t *window = NULL;
-    char *dir = NULL;
+    spectrel_file_t *file = NULL;
     spectrel_spectrogram_t *spectrogram = NULL;
-    spectrel_batch_file_t *batch_file = NULL;
     int status = SPECTREL_FAILURE;
 
     // TODO: Specify configurable parameters via command line arguments.
-    // For now, hard-code them.
     const char *driver = "hackrf";
-    const double frequency = 100e6;
-    const double sample_rate = 2e6;
-    const double bandwidth = 2e6;
-    const double gain = 20;
-    const size_t buffer_size = 2e4;
-    const size_t window_size = 4096;
-    const size_t window_hop = 2048;
-    const float batch_size = 2;
-    const float duration = 10;
-    spectrel_format_t format = SPECTREL_FORMAT_PGM;
+    const char *dir = ".";
+    const double frequency = 100e6;  // Hz
+    const double sample_rate = 2e6;  // Hz
+    const double bandwidth = 2e6;    // Hz
+    const double gain = 20;          // dB
+    const size_t buffer_size = 2e4;  // #samples
+    const size_t window_size = 4096; // #samples
+    const size_t window_hop = 2048;  // #samples
+    const float duration = 1;        // s
 
     // Initialise the receiver.
     receiver =
         spectrel_make_receiver(driver, frequency, sample_rate, bandwidth, gain);
-
     if (!receiver)
         goto cleanup;
 
-    // Create a reusable buffer ready to read samples from the receiver into.
-    buffer = spectrel_make_signal(
-        buffer_size, SPECTREL_EMPTY_SIGNAL, SPECTREL_NO_SIGNAL_PARAMS);
+    // Create a reusable buffer to read samples from the receiver into.
+    buffer = spectrel_make_signal(buffer_size, SPECTREL_EMPTY_SIGNAL, NULL);
     if (!buffer)
         goto cleanup;
 
@@ -62,7 +57,6 @@ int main(int argc, char *argv[])
     if (!plan)
         goto cleanup;
 
-    // Create the window.
     // TODO: Generalise the window (right now, the boxcar window is enforced).
     spectrel_constant_params_t window_params = {1.0};
     window = spectrel_make_signal(
@@ -70,36 +64,22 @@ int main(int argc, char *argv[])
     if (!window)
         goto cleanup;
 
-    // Set up the directory to write data produced at runtime.
-    dir = spectrel_get_dir();
-    if (spectrel_make_dir(dir) != 0)
-        goto cleanup;
+    // Elapsed time is inferred by sample counting.
+    size_t num_samples_elapsed = 0;
+    double sample_interval = 1 / sample_rate;
+    size_t num_samples_total = ceil(duration / sample_interval);
 
-    // Stream samples into the buffer, then apply the short-time DFT.
-    // TODO: Make the duration of capture configurable, keeping track
-    // of elapsed time via sample counting. For now, it's hard-coded.
+    // Open the file to dump the spectrogram to.
+    time_t now = time(NULL);
+    file = spectrel_open_file(dir, &now, driver);
+
+    // Prepare to read samples.
     if (spectrel_activate_stream(receiver) != 0)
         goto cleanup;
 
-    // Compute the time between each sample, assuming a constant sample rate.
-    double sample_interval = 1 / sample_rate;
-
-    // Keep a record of how many samples we've streamed per batch.
-    size_t num_samples_elapsed = 0;
-    size_t num_samples_per_batch = ceil(batch_size / sample_interval);
-
-    // Keep a record of how many samples we've streamed in total.
-    size_t total_num_samples_elapsed = 0;
-    size_t total_num_samples = ceil(duration / sample_interval);
-
-    // Record spectrograms in batched files until the user-specified duration
-    // has elapsed. Elapsed time is inferred by sample counting.
-    while (total_num_samples_elapsed < total_num_samples)
+    // Record spectrograms until the user-specified duration has elapsed.
+    while (num_samples_elapsed < num_samples_total)
     {
-        if (!batch_file)
-        {
-            batch_file = spectrel_open_batch_file(dir, driver, format);
-        }
         if (spectrogram)
         {
             spectrel_free_spectrogram(spectrogram);
@@ -116,42 +96,27 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        // Write the spectrogram to the batch file
-        if (spectrel_write_spectrogram(spectrogram, batch_file, format) != 0)
+        // Write the spectrogram to the file
+        if (spectrel_write_spectrogram(spectrogram, file) != 0)
         {
             goto cleanup;
         }
 
-        total_num_samples_elapsed += buffer_size;
         num_samples_elapsed += buffer_size;
-
-        if (num_samples_elapsed > num_samples_per_batch)
-        {
-            spectrel_close_batch_file(batch_file);
-            batch_file = NULL;
-            num_samples_elapsed = 0;
-        }
     }
-
     status = SPECTREL_SUCCESS;
 
 cleanup:
-    if (batch_file)
-    {
-        spectrel_close_batch_file(batch_file);
-        batch_file = NULL;
-    }
-    if (dir)
-    {
-        free(dir);
-        dir = NULL;
-    }
     if (spectrogram)
     {
         spectrel_free_spectrogram(spectrogram);
         spectrogram = NULL;
     }
-    spectrel_deactivate_stream(receiver);
+    if (file)
+    {
+        spectrel_close_file(file);
+        file = NULL;
+    }
     if (window)
     {
         spectrel_free_signal(window);
@@ -169,6 +134,7 @@ cleanup:
     }
     if (receiver)
     {
+        spectrel_deactivate_stream(receiver);
         spectrel_free_receiver(receiver);
         receiver = NULL;
     }

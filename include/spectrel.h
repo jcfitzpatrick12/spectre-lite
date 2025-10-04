@@ -1,10 +1,10 @@
 #ifndef SPECTREL_H
 #define SPECTREL_H
 
-#include "constants.h"
-#include "errors.h"
-#include "files.h"
-#include "receiver.h"
-#include "stfft.h"
+#include "spconstants.h"
+#include "sperror.h"
+#include "sppath.h"
+#include "spreceiver.h"
+#include "spsignal.h"
 
 #endif // SPECTREL_H
