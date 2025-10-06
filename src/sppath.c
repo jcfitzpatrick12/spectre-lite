@@ -58,9 +58,11 @@ spectrel_open_file(const char *dir, const time_t *t, const char *driver)
 {
     // Convert time to UTC and format as ISO 8601
     struct tm *ut_time = gmtime(t);
-    char datetime[SPECTREL_NUM_CHARS_ISO_8601+1];
-    int num_chars_written =
-        strftime(datetime, SPECTREL_NUM_CHARS_ISO_8601+1, "%Y-%m-%dT%H:%M:%SZ", ut_time);
+    char datetime[SPECTREL_NUM_CHARS_ISO_8601 + 1];
+    int num_chars_written = strftime(datetime,
+                                     SPECTREL_NUM_CHARS_ISO_8601 + 1,
+                                     "%Y-%m-%dT%H:%M:%SZ",
+                                     ut_time);
     if (num_chars_written != SPECTREL_NUM_CHARS_ISO_8601)
     {
         spectrel_print_error("Failed to format the current system time");
