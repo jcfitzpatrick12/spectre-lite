@@ -8,7 +8,6 @@
 
 int exit_failure()
 {
-    spectrel_print_error("An unexpected error occurred");
     return SPECTREL_FAILURE;
 }
 
@@ -31,21 +30,24 @@ int main(int argc, char *argv[])
 
     // TODO: Specify configurable parameters via command line arguments.
     const char *driver = "hackrf";
+    spectrel_receiver_params_t receiver_params = {
+        .frequency = 1e9,    // Hz
+        .sample_rate = 2e6,  // Hz
+        .bandwidth = 1.75e6, // Hz
+        .gain = 20           // dB
+    };
     const char *dir = ".";
-    const double frequency = 100e6;  // Hz
-    const double sample_rate = 2e6;  // Hz
-    const double bandwidth = 2e6;    // Hz
-    const double gain = 20;          // dB
     const size_t buffer_size = 2e4;  // #samples
     const size_t window_size = 4096; // #samples
     const size_t window_hop = 2048;  // #samples
     const float duration = 1;        // s
 
     // Initialise the receiver.
-    receiver =
-        spectrel_make_receiver(driver, frequency, sample_rate, bandwidth, gain);
+    receiver = spectrel_make_receiver(driver, &receiver_params);
     if (!receiver)
         goto cleanup;
+
+    spectrel_describe_receiver(receiver);
 
     // Create a reusable buffer to read samples from the receiver into.
     buffer = spectrel_make_signal(buffer_size, SPECTREL_EMPTY_SIGNAL, NULL);
@@ -57,7 +59,8 @@ int main(int argc, char *argv[])
     if (!plan)
         goto cleanup;
 
-    // TODO: Generalise the window (right now, the boxcar window is enforced).
+    // TODO: Generalise the window (right now, the boxcar window is
+    // enforced).
     spectrel_constant_params_t window_params = {1.0};
     window = spectrel_make_signal(
         window_size, SPECTREL_CONSTANT_SIGNAL, (void *)&window_params);
@@ -66,7 +69,7 @@ int main(int argc, char *argv[])
 
     // Elapsed time is inferred by sample counting.
     size_t num_samples_elapsed = 0;
-    double sample_interval = 1 / sample_rate;
+    double sample_interval = 1 / receiver_params.sample_rate;
     size_t num_samples_total = ceil(duration / sample_interval);
 
     // Open the file to dump the spectrogram to.
@@ -89,8 +92,8 @@ int main(int argc, char *argv[])
         {
             goto cleanup;
         }
-        spectrogram =
-            spectrel_stfft(plan, window, buffer, window_hop, sample_rate);
+        spectrogram = spectrel_stfft(
+            plan, window, buffer, window_hop, receiver_params.sample_rate);
         if (!spectrogram)
         {
             goto cleanup;
