@@ -22,8 +22,7 @@ int spectrel_make_dir(const char *dir)
         }
         else
         {
-            spectrel_print_error(
-                "Failed to create directory '%s': %s", dir, strerror(errno));
+            spectrel_print_error("mkdir failed: %s", strerror(errno));
             return SPECTREL_FAILURE;
         }
     }
@@ -38,19 +37,18 @@ static char *spectrel_join(const char *dir, const char *file_name)
     // +1 for '/' +1 for null terminator
     size_t total_len = dir_len + 1 + file_len + 1;
 
-    char *result = malloc(total_len);
-    if (!result)
+    char *path = malloc(total_len);
+    if (!path)
     {
-        spectrel_print_error(
-            "Memory allocation failed for directory join result");
+        spectrel_print_error("malloc failed: path");
         return NULL;
     }
 
-    strcpy(result, dir);
-    result[dir_len] = '/';
-    strcpy(result + dir_len + 1, file_name);
+    strcpy(path, dir);
+    path[dir_len] = '/';
+    strcpy(path + dir_len + 1, file_name);
 
-    return result;
+    return path;
 }
 
 spectrel_file_t *
@@ -65,7 +63,7 @@ spectrel_open_file(const char *dir, const time_t *t, const char *driver)
                                      ut_time);
     if (num_chars_written != SPECTREL_NUM_CHARS_ISO_8601)
     {
-        spectrel_print_error("Failed to format the current system time");
+        spectrel_print_error("strftime failed");
         return NULL;
     }
 
@@ -75,14 +73,14 @@ spectrel_open_file(const char *dir, const time_t *t, const char *driver)
     char *file_name = malloc(num_chars_file_name * sizeof(char));
     if (!file_name)
     {
-        spectrel_print_error("Memory allocation failed for the file name");
+        spectrel_print_error("malloc failed: file_name");
         return NULL;
     }
     int ret = snprintf(
         file_name, num_chars_file_name, "%s_%s.cf64", datetime, driver);
     if (ret < 0)
     {
-        spectrel_print_error("Failed to format the file name");
+        spectrel_print_error("snprintf failed: file_name");
         free(file_name);
         return NULL;
     }
@@ -91,7 +89,7 @@ spectrel_open_file(const char *dir, const time_t *t, const char *driver)
     char *file_path = spectrel_join(dir, file_name);
     if (!file_path)
     {
-        spectrel_print_error("Failed to create the full file path");
+        spectrel_print_error("join failed: file_path");
         free(file_name);
         return NULL;
     }
@@ -100,7 +98,7 @@ spectrel_open_file(const char *dir, const time_t *t, const char *driver)
     FILE *file = fopen(file_path, "wb");
     if (!file)
     {
-        spectrel_print_error("Failed to open %s", file_path);
+        spectrel_print_error("fopen failed: %s", file_path);
         free(file_name);
         free(file_path);
         return NULL;
@@ -110,7 +108,7 @@ spectrel_open_file(const char *dir, const time_t *t, const char *driver)
     spectrel_file_t *spfile = malloc(sizeof(spectrel_file_t));
     if (!spfile)
     {
-        spectrel_print_error("Memory allocation failed for spfile");
+        spectrel_print_error("malloc failed: spfile");
         fclose(file);
         free(file_name);
         free(file_path);

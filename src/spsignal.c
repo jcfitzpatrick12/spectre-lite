@@ -107,7 +107,7 @@ spectrel_generate_signal(const size_t num_samples,
 
     if (!samples)
     {
-        spectrel_print_error("Memory allocation failed for signal samples");
+        spectrel_print_error("malloc failed: samples");
         return NULL;
     }
 
@@ -116,7 +116,7 @@ spectrel_generate_signal(const size_t num_samples,
     {
         fftw_free(samples);
         samples = NULL;
-        spectrel_print_error("Memory allocation failed for signal struct");
+        spectrel_print_error("malloc failed: signal");
         return NULL;
     }
 
@@ -187,7 +187,7 @@ spectrel_plan spectrel_make_plan(const size_t buffer_size)
     spectrel_signal_t *buffer = spectrel_make_buffer(buffer_size);
     if (!buffer)
     {
-        spectrel_print_error("Failed to create buffer signal");
+        spectrel_print_error("make_buffer failed");
         return NULL;
     }
 
@@ -201,7 +201,7 @@ spectrel_plan spectrel_make_plan(const size_t buffer_size)
     {
         spectrel_free_signal(buffer);
         buffer = NULL;
-        spectrel_print_error("Failed to create DFT plan");
+        spectrel_print_error("plan_dft_1d failed");
         return NULL;
     }
 
@@ -215,7 +215,7 @@ spectrel_plan spectrel_make_plan(const size_t buffer_size)
         spectrel_free_signal(buffer);
         buffer = NULL;
 
-        spectrel_print_error("Memory allocation failed for plan struct");
+        spectrel_print_error("malloc failed: spectrel_plan");
         return NULL;
     }
 
@@ -231,7 +231,7 @@ spectrel_make_empty_spectrogram(const size_t num_spectrums,
     spectrel_spectrogram_t *spectrogram = malloc(sizeof(*spectrogram));
     if (!spectrogram)
     {
-        spectrel_print_error("Memory allocation failed for spectrogram struct");
+        spectrel_print_error("malloc failed: spectrogram");
         return NULL;
     }
 
@@ -240,7 +240,7 @@ spectrel_make_empty_spectrogram(const size_t num_spectrums,
     {
         free(spectrogram);
         spectrogram = NULL;
-        spectrel_print_error("Memory allocation failed for times array");
+        spectrel_print_error("malloc failed: times");
         return NULL;
     }
 
@@ -254,7 +254,7 @@ spectrel_make_empty_spectrogram(const size_t num_spectrums,
 
         free(times);
         times = NULL;
-        spectrel_print_error("Memory allocation failed for frequencies array");
+        spectrel_print_error("malloc failed: frequencies");
         return NULL;
     }
 
@@ -271,8 +271,7 @@ spectrel_make_empty_spectrogram(const size_t num_spectrums,
         free(frequencies);
         frequencies = NULL;
 
-        spectrel_print_error(
-            "Memory allocation failed for spectrogram samples");
+        spectrel_print_error("malloc failed: samples");
         return NULL;
     }
 
@@ -422,7 +421,7 @@ spectrel_spectrogram_t *spectrel_stfft(spectrel_plan p,
     // Handle if the memory allocation fails
     if (!s)
     {
-        spectrel_print_error("Failed to create empty spectrogram");
+        spectrel_print_error("make_empty_spectrogam failed");
         return NULL;
     }
 
