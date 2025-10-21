@@ -12,6 +12,7 @@ typedef struct
     double sample_rate; // The sample rate, in Hz.
     double bandwidth;   // The bandwidth, in Hz.
     double gain;        // The gain, in dB.
+    char *format;       // The format of each sample.
 } spectrel_receiver_params_t;
 
 /**
