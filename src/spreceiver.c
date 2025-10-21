@@ -399,4 +399,5 @@ void spectrel_describe_receiver(spectrel_receiver receiver)
     printf("Sample rate: %.4lf [Hz]\n", params.sample_rate);
     printf("Bandwidth: %.4lf [Hz]\n", params.bandwidth);
     printf("Gain: %.4lf [dB]\n", params.gain);
+    printf("Format: %s\n", receiver->format);
 }
