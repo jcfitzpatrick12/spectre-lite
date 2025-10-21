@@ -3,9 +3,9 @@
 </h1>
 
 <div align="center">
-  <img src="gallery/rtlsdr_example.png" width="30%" height="400px" hspace="5">
-  <img src="gallery/spectre.png" width="30%" height="400px" hspace="5">
-  <img src="gallery/rtlsdr_example.png" width="30%" height="400px" hspace="5">
+  <img src="gallery/rtlsdr_example.png" width="30%">
+  <img src="gallery/spectre.png" width="30%">
+  <img src="gallery/rtlsdr_example.png" width="30%">
 </div>
 
 ## Getting started
