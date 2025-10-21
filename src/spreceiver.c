@@ -315,14 +315,14 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
     long long timeNs;
     int ret;
 
-    // The input buffer is compatable with the format SOAPY_SDR_CF64, but not
-    // SOAPY_SDR_CF32
+    // The buffer passed in by the caller is compatable with the format
+    // SOAPY_SDR_CF64, but not SOAPY_SDR_CF32
     bool needs_conversion = strcmp(receiver->format, SOAPY_SDR_CF32) == 0;
 
     if (!needs_conversion)
     {
-        // If the buffer format is compatable with the device format, fill the
-        // buffer directly.
+        // If the buffer format is compatable with the device format, fill it
+        // directly.
         while (num_samples_read < buffer->num_samples)
         {
             buffers[0] = (void *)(buffer->samples + num_samples_read);
@@ -343,11 +343,11 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
             }
             num_samples_read += ret;
         }
+        return SPECTREL_SUCCESS;
     }
     else
     {
-        // Otherwise, fill a temporary buffer of a format compatible with the
-        // device format.
+        // Otherwise, fill an intermediate buffer with a compatible format.
         complex float *buffer_cf32 =
             malloc(buffer->num_samples * sizeof(complex float));
         if (!buffer_cf32)
@@ -366,7 +366,7 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
                                                     num_samples_read,
                                                 &flags,
                                                 &timeNs,
-                                                1e6);
+                                                SPECTREL_TIMEOUT);
 
             if (ret < 1)
             {
@@ -387,9 +387,8 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
         }
         free(buffer_cf32);
         buffer_cf32 = NULL;
+        return SPECTREL_SUCCESS;
     }
-
-    return SPECTREL_SUCCESS;
 }
 
 void spectrel_describe_receiver(spectrel_receiver receiver)
