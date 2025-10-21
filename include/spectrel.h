@@ -1,6 +1,7 @@
 #ifndef SPECTREL_H
 #define SPECTREL_H
 
+#include "spargparse.h"
 #include "spconstants.h"
 #include "sperror.h"
 #include "sppath.h"

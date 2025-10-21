@@ -236,21 +236,25 @@ spectrel_receiver spectrel_make_receiver(const char *driver,
         return NULL;
     }
 
-    // Set up the stream.
-    if (strcmp(params->format, SOAPY_SDR_CF64) != 0 &&
-        strcmp(params->format, SOAPY_SDR_CF32) != 0)
+    // Infer the format from the driver.
+    char *format;
+    if (strcmp(driver, "rtlsdr") == 0)
     {
-        spectrel_free_receiver(receiver);
-        receiver = NULL;
-        spectrel_print_error(
-            "Unexpected format: %s. Please provide either %s or %s. \n",
-            params->format,
-            SOAPY_SDR_CF32,
-            SOAPY_SDR_CF64);
-        return NULL;
+        format = "CF32";
     }
+    else if (strcmp(driver, "hackrf") == 0)
+    {
+        format = "CF64";
+    }
+    else
+    {
+        format = SPECTREL_DEFAULT_FORMAT;
+    }
+    receiver->format = strdup(format);
+
+    // Set up the stream.
     receiver->rx_stream = SoapySDRDevice_setupStream(
-        receiver->device, SOAPY_SDR_RX, params->format, NULL, 0, NULL);
+        receiver->device, SOAPY_SDR_RX, receiver->format, NULL, 0, NULL);
     if (!receiver->rx_stream)
     {
         spectrel_free_receiver(receiver);
@@ -259,10 +263,6 @@ spectrel_receiver spectrel_make_receiver(const char *driver,
                              SoapySDRDevice_lastError());
         return NULL;
     }
-
-    // Finally, set the format.
-    receiver->format = strdup(params->format);
-
     return receiver;
 }
 
@@ -337,7 +337,7 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
 
             if (ret < 1)
             {
-                spectrel_print_error("readStream fail: %s\n",
+                spectrel_print_error("readStream failed: %s\n",
                                      SoapySDRDevice_lastError());
                 return SPECTREL_FAILURE;
             }
@@ -352,7 +352,7 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
             malloc(buffer->num_samples * sizeof(complex float));
         if (!buffer_cf32)
         {
-            spectrel_print_error("malloc fail: buffer_cf32");
+            spectrel_print_error("malloc failed: buffer_cf32");
             return SPECTREL_FAILURE;
         }
 
@@ -371,7 +371,7 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
             if (ret < 1)
             {
                 const char *error = SoapySDRDevice_lastError();
-                spectrel_print_error("readStream fail: %s\n", error);
+                spectrel_print_error("readStream failed: %s\n", error);
                 free(buffer_cf32);
                 buffer_cf32 = NULL;
                 return SPECTREL_FAILURE;

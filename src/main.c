@@ -20,6 +20,7 @@ int exit_success()
 int main(int argc, char *argv[])
 {
     // Initialise the program.
+    spectrel_args_t *args = NULL;
     spectrel_receiver receiver = NULL;
     spectrel_signal_t *buffer = NULL;
     spectrel_plan plan = NULL;
@@ -28,34 +29,31 @@ int main(int argc, char *argv[])
     spectrel_spectrogram_t *spectrogram = NULL;
     int status = SPECTREL_FAILURE;
 
-    // TODO: Specify configurable parameters via command line arguments.
-    const char *driver = "hackrf";
-    spectrel_receiver_params_t receiver_params = {
-        .frequency = 1e9,    // Hz
-        .sample_rate = 2e6,  // Hz
-        .bandwidth = 1.75e6, // Hz
-        .gain = 20           // dB
-    };
-    const char *dir = ".";
-    const size_t buffer_size = 2e4;  // #samples
-    const size_t window_size = 4096; // #samples
-    const size_t window_hop = 2048;  // #samples
-    const float duration = 1;        // s
+    args = spectrel_parse_args(argc, argv);
+    if (!args)
+        goto cleanup;
+    spectrel_describe_args(args);
 
     // Initialise the receiver.
-    receiver = spectrel_make_receiver(driver, &receiver_params);
+    spectrel_receiver_params_t receiver_params = {.frequency = args->frequency,
+                                                  .sample_rate =
+                                                      args->sample_rate,
+                                                  .bandwidth = args->bandwidth,
+                                                  .gain = args->gain};
+    receiver = spectrel_make_receiver(args->driver, &receiver_params);
     if (!receiver)
         goto cleanup;
 
     spectrel_describe_receiver(receiver);
 
     // Create a reusable buffer to read samples from the receiver into.
-    buffer = spectrel_make_signal(buffer_size, SPECTREL_EMPTY_SIGNAL, NULL);
+    buffer =
+        spectrel_make_signal(args->buffer_size, SPECTREL_EMPTY_SIGNAL, NULL);
     if (!buffer)
         goto cleanup;
 
     // Plan the short-time DFT.
-    plan = spectrel_make_plan(window_size);
+    plan = spectrel_make_plan(args->window_size);
     if (!plan)
         goto cleanup;
 
@@ -63,18 +61,20 @@ int main(int argc, char *argv[])
     // enforced).
     spectrel_constant_params_t window_params = {1.0};
     window = spectrel_make_signal(
-        window_size, SPECTREL_CONSTANT_SIGNAL, (void *)&window_params);
+        args->window_size, SPECTREL_CONSTANT_SIGNAL, (void *)&window_params);
     if (!window)
         goto cleanup;
 
     // Elapsed time is inferred by sample counting.
     size_t num_samples_elapsed = 0;
     double sample_interval = 1 / receiver_params.sample_rate;
-    size_t num_samples_total = ceil(duration / sample_interval);
+    size_t num_samples_total = ceil(args->duration / sample_interval);
 
     // Open the file to dump the spectrogram to.
     time_t now = time(NULL);
-    file = spectrel_open_file(dir, &now, driver);
+    if (spectrel_make_dir(args->dir) != 0)
+        goto cleanup;
+    file = spectrel_open_file(args->dir, &now, args->driver);
 
     // Prepare to read samples.
     if (spectrel_activate_stream(receiver) != 0)
@@ -92,8 +92,11 @@ int main(int argc, char *argv[])
         {
             goto cleanup;
         }
-        spectrogram = spectrel_stfft(
-            plan, window, buffer, window_hop, receiver_params.sample_rate);
+        spectrogram = spectrel_stfft(plan,
+                                     window,
+                                     buffer,
+                                     args->window_hop,
+                                     receiver_params.sample_rate);
         if (!spectrogram)
         {
             goto cleanup;
@@ -105,7 +108,7 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        num_samples_elapsed += buffer_size;
+        num_samples_elapsed += args->buffer_size;
     }
     status = SPECTREL_SUCCESS;
 
@@ -140,6 +143,11 @@ cleanup:
         spectrel_deactivate_stream(receiver);
         spectrel_free_receiver(receiver);
         receiver = NULL;
+    }
+    if (args)
+    {
+        spectrel_free_args(args);
+        args = NULL;
     }
     return (status == SPECTREL_SUCCESS) ? exit_success() : exit_failure();
 }
