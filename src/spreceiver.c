@@ -8,14 +8,17 @@
 #include <SoapySDR/Device.h>
 #include <SoapySDR/Formats.h>
 
+#include <complex.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct spectrel_receiver_t
 {
     SoapySDRDevice *device;
     SoapySDRStream *rx_stream;
+    char *format;
 };
 
 int spectrel_free_receiver(spectrel_receiver receiver)
@@ -25,6 +28,11 @@ int spectrel_free_receiver(spectrel_receiver receiver)
         return SPECTREL_SUCCESS;
     }
 
+    if (receiver->format)
+    {
+        free(receiver->format);
+        receiver->format = NULL;
+    }
     if (receiver->device && receiver->rx_stream)
     {
         if (SoapySDRDevice_closeStream(receiver->device, receiver->rx_stream) !=
@@ -144,7 +152,7 @@ spectrel_receiver spectrel_make_receiver(const char *driver,
         return NULL;
     }
 
-    // Set the sample rate.
+    // Set the sample rate, first checking it's in range.
     range_size = 0;
     SoapySDRRange *sample_rate_ranges = SoapySDRDevice_getSampleRateRange(
         receiver->device, SOAPY_SDR_RX, 0, &range_size);
@@ -178,7 +186,7 @@ spectrel_receiver spectrel_make_receiver(const char *driver,
         return NULL;
     }
 
-    // Set the bandwidth.
+    // Set the bandwidth, first checking it's in range.
     range_size = 0;
     SoapySDRRange *bandwidth_ranges = SoapySDRDevice_getBandwidthRange(
         receiver->device, SOAPY_SDR_RX, 0, &range_size);
@@ -209,7 +217,7 @@ spectrel_receiver spectrel_make_receiver(const char *driver,
         return NULL;
     }
 
-    // Set the gain.
+    // Set the gain, first checking it's in range.
     SoapySDRRange gain_range =
         SoapySDRDevice_getGainRange(receiver->device, SOAPY_SDR_RX, 0);
     if (!is_value_in_range(params->gain, &gain_range))
@@ -229,8 +237,20 @@ spectrel_receiver spectrel_make_receiver(const char *driver,
     }
 
     // Set up the stream.
+    if (strcmp(params->format, SOAPY_SDR_CF64) != 0 &&
+        strcmp(params->format, SOAPY_SDR_CF32) != 0)
+    {
+        spectrel_free_receiver(receiver);
+        receiver = NULL;
+        spectrel_print_error(
+            "Unexpected format: %s. Please provide either %s or %s. \n",
+            params->format,
+            SOAPY_SDR_CF32,
+            SOAPY_SDR_CF64);
+        return NULL;
+    }
     receiver->rx_stream = SoapySDRDevice_setupStream(
-        receiver->device, SOAPY_SDR_RX, SOAPY_SDR_CF64, NULL, 0, NULL);
+        receiver->device, SOAPY_SDR_RX, params->format, NULL, 0, NULL);
     if (!receiver->rx_stream)
     {
         spectrel_free_receiver(receiver);
@@ -239,6 +259,9 @@ spectrel_receiver spectrel_make_receiver(const char *driver,
                              SoapySDRDevice_lastError());
         return NULL;
     }
+
+    // Finally, set the format.
+    receiver->format = strdup(params->format);
 
     return receiver;
 }
@@ -288,29 +311,84 @@ int spectrel_read_stream(spectrel_receiver receiver, spectrel_signal_t *buffer)
 {
     int num_samples_read = 0;
     void *buffers[] = {NULL};
+    int flags;
+    long long timeNs;
+    int ret;
 
-    // Keep calling readStream until the buffer is full.
-    while (num_samples_read < buffer->num_samples)
+    // The buffer passed in by the caller is compatable with the format
+    // SOAPY_SDR_CF64, but not SOAPY_SDR_CF32
+    bool needs_conversion = strcmp(receiver->format, SOAPY_SDR_CF32) == 0;
+
+    if (!needs_conversion)
     {
-        buffers[0] = (void *)(buffer->samples + num_samples_read);
-        int ret =
-            SoapySDRDevice_readStream(receiver->device,
-                                      receiver->rx_stream,
-                                      buffers,
-                                      buffer->num_samples - num_samples_read,
-                                      0,
-                                      0,
-                                      SPECTREL_TIMEOUT);
-        if (ret < 1)
+        // If the buffer format is compatable with the device format, fill it
+        // directly.
+        while (num_samples_read < buffer->num_samples)
         {
-            spectrel_print_error("readStream fail: %s\n",
-                                 SoapySDRDevice_lastError());
+            buffers[0] = (void *)(buffer->samples + num_samples_read);
+            ret = SoapySDRDevice_readStream(receiver->device,
+                                            receiver->rx_stream,
+                                            buffers,
+                                            buffer->num_samples -
+                                                num_samples_read,
+                                            &flags,
+                                            &timeNs,
+                                            SPECTREL_TIMEOUT);
+
+            if (ret < 1)
+            {
+                spectrel_print_error("readStream fail: %s\n",
+                                     SoapySDRDevice_lastError());
+                return SPECTREL_FAILURE;
+            }
+            num_samples_read += ret;
+        }
+        return SPECTREL_SUCCESS;
+    }
+    else
+    {
+        // Otherwise, fill an intermediate buffer with a compatible format.
+        complex float *buffer_cf32 =
+            malloc(buffer->num_samples * sizeof(complex float));
+        if (!buffer_cf32)
+        {
+            spectrel_print_error("malloc fail: buffer_cf32");
             return SPECTREL_FAILURE;
         }
-        num_samples_read += ret;
-    }
 
-    return SPECTREL_SUCCESS;
+        while (num_samples_read < buffer->num_samples)
+        {
+            buffers[0] = buffer_cf32 + num_samples_read;
+            int ret = SoapySDRDevice_readStream(receiver->device,
+                                                receiver->rx_stream,
+                                                buffers,
+                                                buffer->num_samples -
+                                                    num_samples_read,
+                                                &flags,
+                                                &timeNs,
+                                                SPECTREL_TIMEOUT);
+
+            if (ret < 1)
+            {
+                const char *error = SoapySDRDevice_lastError();
+                spectrel_print_error("readStream fail: %s\n", error);
+                free(buffer_cf32);
+                buffer_cf32 = NULL;
+                return SPECTREL_FAILURE;
+            }
+            num_samples_read += ret;
+        }
+
+        // Finally, type cast and copy the samples into the buffer passed in by
+        // the caller.
+        for (size_t n = 0; n < buffer->num_samples; n++)
+        {
+            buffer->samples[n] = (complex double)buffer_cf32[n];
+        }
+        free(buffer_cf32);
+        buffer_cf32 = NULL;
+        return SPECTREL_SUCCESS;
+    }
 }
 
 void spectrel_describe_receiver(spectrel_receiver receiver)
@@ -321,4 +399,5 @@ void spectrel_describe_receiver(spectrel_receiver receiver)
     printf("Sample rate: %.4lf [Hz]\n", params.sample_rate);
     printf("Bandwidth: %.4lf [Hz]\n", params.bandwidth);
     printf("Gain: %.4lf [dB]\n", params.gain);
+    printf("Format: %s\n", receiver->format);
 }
