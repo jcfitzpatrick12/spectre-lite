@@ -41,7 +41,7 @@ _Spectrel_ is expected to be compatible with most Linux distributions.
     ```bash
     spectrel -r <receiver> -f <frequency> -s <sample_rate> -b <bandwidth> -g <gain> -T <duration> [-d directory]  [-w window_size] [-h window_hop] [-B buffer_size]
     ```
-    The spectrograms are streamed to a file named `<timestamp>_<receiver>.cf64`, where `<time_stamp>` is the current system time formatted in the ISO 8601 standard and `<receiver>` is the SDR driver name. Each sample corresponds to a complex DFT amplitude (64 bits per component), and are stored in column (spectrum) major ordering.
+    The spectrograms are streamed to a file named `<timestamp>_<receiver>.cf64`, where `<time_stamp>` is the current system time formatted in the ISO 8601 standard and `<receiver>` is the SDR driver name. Each sample corresponds to a complex DFT amplitude (64 bits per component), stored in column (spectrum) major ordering.
 
     **OPTIONS**
 
