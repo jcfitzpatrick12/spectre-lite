@@ -21,13 +21,13 @@ _Spectrel_ is expected to be compatible with most Linux distributions.
 
 - [FFTW3](https://www.fftw.org/)
 - [SoapySDR](https://github.com/pothosware/SoapySDR)
-- The drivers for the hardware you want to have support for.
+- The drivers for the hardware you want to have support for. 
 
 ### Installation
 
 1. **Clone the repository**  
     ```bash
-    git clone https://github.com/jcfitzpatrick12/spectre-lite.git && cd spectre-lite
+    git clone https://github.com/jcfitzpatrick12/spectrel.git && cd spectrel
     ```
 
 2. **Build the binary**  
