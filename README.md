@@ -10,7 +10,7 @@
 
 ## Getting started
 
-_Spectrel_ is (yet another) receiver-agnostic program for recording radio spectrograms. It offers a light-weight alternative to [_Spectre_](https://github.com/jcfitzpatrick12/spectre), powered by [SoapySDR](https://github.com/pothosware/SoapySDR) and the [FFTW](https://www.fftw.org/) library.
+_Spectrel_ is (yet another) receiver-agnostic program for recording radio spectrograms. It offers a lightweight alternative to [_Spectre_](https://github.com/jcfitzpatrick12/spectre) written in pure C. Powered by [SoapySDR](https://github.com/pothosware/SoapySDR) and the [FFTW](https://www.fftw.org/) library.
 
 > :warning: We're in pre-alpha - please expect some instability.
 
